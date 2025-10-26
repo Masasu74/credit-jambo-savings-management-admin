@@ -467,3 +467,28 @@ export const cancelTransaction = async (req, res) => {
     });
   }
 };
+
+// Get recent transactions
+export const getRecentTransactions = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    
+    const transactions = await Transaction.find()
+      .populate('accountId', 'accountNumber accountType')
+      .populate('customerId', 'customerCode personalInfo.fullName')
+      .sort({ createdAt: -1 })
+      .limit(limit);
+
+    res.json({
+      success: true,
+      data: transactions
+    });
+  } catch (error) {
+    console.error('Error fetching recent transactions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch recent transactions',
+      error: error.message
+    });
+  }
+};

@@ -87,8 +87,7 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
       name: "Customers",
       icon: <FaUser size={20} style={{ color: currentColors.primary }} />,
       submenus: [
-        { name: "View all Customers", path: "/customers" },
-        { name: "Add a Customer", path: "/customers/add" }
+        { name: "View all Customers", path: "/customers" }
       ]
     },
     {

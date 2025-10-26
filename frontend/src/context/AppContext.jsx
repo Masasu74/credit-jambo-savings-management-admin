@@ -10,12 +10,12 @@ const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loans, setLoans] = useState([]);
+  // const [loans, setLoans] = useState([]); // Removed - this is a savings system, not a loan system
   const [customers, setCustomers] = useState([]);
   const [branches, setBranches] = useState([]);
   const [users, setUsers] = useState([]);
   const [notifications, setNotifications] = useState([]);
-  const [loanProducts, setLoanProducts] = useState([]);
+  // const [loanProducts, setLoanProducts] = useState([]); // Removed - this is a savings system
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   // Boot sequencing: ensure priority data (customers, loans) load first
@@ -24,7 +24,7 @@ export const AppProvider = ({ children }) => {
   
   // Individual loading states for better UX
   const [customersLoading, setCustomersLoading] = useState(false);
-  const [loansLoading, setLoansLoading] = useState(false);
+  // const [loansLoading, setLoansLoading] = useState(false); // Removed - this is a savings system
   const [branchesLoading, setBranchesLoading] = useState(false);
   const [usersLoading, setUsersLoading] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
@@ -74,7 +74,9 @@ export const AppProvider = ({ children }) => {
         
         if (!isCustomerAPI) {
           const token = localStorage.getItem("token");
-          if (token) config.headers.Authorization = `Bearer ${token}`;
+          if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+          }
         }
         
         // Debug API requests (development only)
@@ -120,10 +122,9 @@ export const AppProvider = ({ children }) => {
           
           if (!isCustomerAPI) {
             // Only handle staff authentication errors
-            localStorage.removeItem("token");
-            setUser(null);
-            toast.error("Session expired. Please log in again.");
-            // Don't redirect immediately, let individual components handle it
+            // Don't clear token immediately - let the component handle it
+            // This prevents logout on page refresh
+            console.warn("Authentication error - token may be invalid");
           }
           // For customer API calls, let the customer components handle the error
         } else if (status === 403) {
@@ -194,18 +195,28 @@ export const AppProvider = ({ children }) => {
       try {
         const token = localStorage.getItem("token");
         if (token) {
-          const { data } = await api.get("/user/me");
-          setUser(data.user);
-          const now = Date.now();
-          setLastActivity(now); // Set initial activity time
-          localStorage.setItem('lastActivity', now.toString());
-          // Signal a secondary effect to load priority data
-          setShouldLoadPriority(true);
+          try {
+            const { data } = await api.get("/user/me");
+            setUser(data.user);
+            const now = Date.now();
+            setLastActivity(now); // Set initial activity time
+            localStorage.setItem('lastActivity', now.toString());
+            // Signal a secondary effect to load priority data
+            setShouldLoadPriority(true);
+          } catch (authError) {
+            // Only clear token if it's actually invalid (401)
+            if (authError.response?.status === 401) {
+              localStorage.removeItem("token");
+              setUser(null);
+              setError("Session expired. Please log in again.");
+            } else {
+              // For other errors (network, etc.), keep the token but show error
+              setError(authError.response?.data?.message || "Authentication check failed");
+            }
+          }
         }
       } catch (error) {
-        localStorage.removeItem("token");
-        setUser(null);
-        setError(error.response?.data?.message || "Authentication failed");
+        setError(error.message || "Authentication failed");
       } finally {
         setLoading(false);
       }
@@ -361,7 +372,7 @@ export const AppProvider = ({ children }) => {
     try {
       setCustomersLoading(true);
       // Add cache-busting parameter when force refresh is requested
-      const url = forceRefresh ? `/customer/list?nocache=true&t=${Date.now()}` : "/customer/list";
+      const url = forceRefresh ? `/customers?nocache=true&t=${Date.now()}` : "/customers";
       const { data } = await api.get(url);
       
       if (data && data.success) {
@@ -382,7 +393,7 @@ export const AppProvider = ({ children }) => {
 
   const createCustomer = async (formData) => {
     try {
-      const { data } = await api.post("/customer/add", formData, {
+      const { data } = await api.post("/customers", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       
@@ -398,7 +409,7 @@ export const AppProvider = ({ children }) => {
 
   const fetchSingleCustomer = async (id) => {
     try {
-      const { data } = await api.get(`/customer/${id}`);
+      const { data } = await api.get(`/customers/${id}`);
       return data.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || "Failed to fetch customer");
@@ -407,7 +418,7 @@ export const AppProvider = ({ children }) => {
 
   const updateCustomer = async (id, formData) => {
     try {
-      const { data } = await api.put(`/customer/${id}`, formData, {
+      const { data } = await api.put(`/customers/${id}`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setCustomers((prev) => prev.map((c) => (c._id === id ? data.data : c)));
@@ -423,7 +434,7 @@ export const AppProvider = ({ children }) => {
   const deleteCustomer = async (id, forceDelete = false) => {
     try {
       // First, get deletion preview to show financial impact
-      const previewResponse = await api.get(`/customer/${id}/deletion-preview`);
+      const previewResponse = await api.get(`/customers/${id}/deletion-preview`);
       const { preview, validation } = previewResponse.data;
       
       // If deletion is not safe and not forced, show detailed confirmation
@@ -444,7 +455,7 @@ export const AppProvider = ({ children }) => {
       }
       
       // Proceed with deletion
-      const response = await api.delete(`/customer/${id}`, { 
+      const response = await api.delete(`/customers/${id}`, { 
         data: { forceDelete } 
       });
       
@@ -486,46 +497,14 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const fetchLoans = useCallback(async (getAll = false, forceRefresh = false) => {
-    console.log('🔄 fetchLoans: Starting fetch, getAll:', getAll, 'forceRefresh:', forceRefresh);
-    try {
-      setLoansLoading(true);
-      setError(null);
-      
-      // Add cache-busting parameter when force refresh is requested
-      let url = getAll ? '/loan/list?all=true' : '/loan/list';
-      if (forceRefresh) {
-        url += (url.includes('?') ? '&' : '?') + `nocache=true&t=${Date.now()}`;
-      }
-      console.log('🌐 fetchLoans: Fetching from URL:', url);
-      
-      const { data } = await api.get(url);
-      console.log('📥 fetchLoans: Received response:', data);
-      
-      if (data && data.success) {
-        console.log('✅ fetchLoans: Setting loans data, count:', data.data?.length || 0);
-        setLoans(data.data || []);
-      } else {
-        throw new Error(data?.message || 'Failed to fetch loans');
-      }
-    } catch (error) {
-      console.error("❌ fetchLoans error:", error);
-      setError(error.response?.data?.message || error.message || "Failed to fetch loans");
-      setLoans([]);
-    } finally {
-      setLoansLoading(false);
-      console.log('🏁 fetchLoans: Fetch completed');
-    }
-  }, [api]);
+  // Removed fetchLoans - this is a savings system, not a loan system
 
-  // Priority boot loader: customers first, then loans
+  // Priority boot loader: customers only (this is a savings system)
   const loadPriorityData = useCallback(async () => {
     if (priorityDataReady) return; // already loaded
-    // Customers before loans to populate denormalized fields
     await fetchCustomers(true);
-    await fetchLoans(true, true);
     setPriorityDataReady(true);
-  }, [priorityDataReady, fetchCustomers, fetchLoans]);
+  }, [priorityDataReady, fetchCustomers]);
 
   // Trigger priority load when flagged after auth
   useEffect(() => {
@@ -543,163 +522,11 @@ export const AppProvider = ({ children }) => {
     return () => { cancelled = true; };
   }, [shouldLoadPriority, loadPriorityData]);
 
-  const fetchSingleLoan = useCallback(async (id) => {
-    try {
-      const { data } = await api.get(`/loan/${id}`);
-      return data.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || "Failed to fetch loan");
-    }
-  }, [api]);
+  // Removed fetchSingleLoan - this is a savings system
 
-  const createLoan = async (loanData, files) => {
-    // Decide whether to send multipart or JSON
-    const requirementEntries = files?.requirements
-      ? Object.entries(files.requirements).filter(([, f]) => !!f)
-      : [];
-    const hasFiles = requirementEntries.length > 0;
+  // Removed createLoan - this is a savings system
 
-    try {
-      if (!hasFiles) {
-        // Send JSON when there are no files to avoid multipart parsing issues
-        const { data } = await api.post("/loan/add", loanData);
-        
-        // Force refresh loans data immediately to ensure consistency
-        await fetchLoans(false, true);
-        
-        toast.success("Loan created successfully!");
-        return { success: true, data: data.data };
-      }
-
-      // Build multipart only when needed
-      const formData = new FormData();
-      
-      // Handle simple fields directly
-      Object.entries(loanData).forEach(([k, v]) => {
-        if (typeof v === "object" && v !== null && !(v instanceof File)) {
-          // For nested objects like collateral, stringify them
-          formData.append(k, JSON.stringify(v));
-        } else {
-          formData.append(k, v);
-        }
-      });
-      
-      requirementEntries.forEach(([, file]) => {
-        formData.append("requirements", file);
-      });
-
-      const { data } = await api.post("/loan/add", formData);
-      
-      // Force refresh loans data immediately to ensure consistency
-      await fetchLoans(false, true);
-      
-      toast.success("Loan created successfully!");
-      return { success: true, data: data.data };
-    } catch (error) {
-      return handlePermissionError(error, "create loans");
-    }
-  };
-
-  const updateLoan = async (id, formData) => {
-    try {
-      const { data } = await api.patch(`/loan/${id}`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      setLoans((prev) => prev.map((loan) => (loan._id === id ? data.data : loan)));
-      // Refresh loans data to ensure consistency
-      await fetchLoans();
-      toast.success("Loan updated successfully!");
-      return { success: true, data: data.data };
-    } catch (error) {
-      return handlePermissionError(error, "update loans");
-    }
-  };
-
-  const updateLoanStatus = async (loanId, actionOrPayload, extras) => {
-    try {
-      let payload = {};
-      if (typeof actionOrPayload === 'string') {
-        payload = { action: actionOrPayload, ...(extras || {}) };
-      } else if (typeof actionOrPayload === 'object' && actionOrPayload !== null) {
-        payload = actionOrPayload;
-      }
-
-      const { data } = await api.patch(`/loan/status/${loanId}`, payload);
-      setLoans((prev) => prev.map((loan) => (loan._id === loanId ? data.data : loan)));
-      // Refresh loans data to ensure consistency
-      await fetchLoans();
-      toast.success("Loan status updated successfully!");
-      return { success: true, data: data.data };
-    } catch (error) {
-      return handlePermissionError(error, "update loan status");
-    }
-  };
-
-  const deleteLoan = async (loanId, forceDelete = false) => {
-    try {
-      // First, get deletion preview to show financial impact
-      const previewResponse = await api.get(`/loan/${loanId}/deletion-preview`);
-      const { preview, validation } = previewResponse.data;
-      
-      // If deletion is not safe and not forced, show detailed confirmation
-      if (!validation.isSafe && !forceDelete) {
-        const confirmed = window.confirm(
-          `⚠️ WARNING: This loan has significant financial data that will be deleted:\n\n` +
-          `• ${preview.transactions.length} financial transactions (${preview.totalAmount.toLocaleString()} RWF)\n` +
-          `• ${preview.taxRecords.length} tax records\n\n` +
-          `Impact Level: ${preview.estimatedImpact.toUpperCase()}\n\n` +
-          `Warnings:\n${validation.warnings.join('\n')}\n\n` +
-          `Recommendations:\n${validation.recommendations.join('\n')}\n\n` +
-          `Are you sure you want to proceed with deletion? This action cannot be undone.`
-        );
-        
-        if (!confirmed) {
-          return { cancelled: true };
-        }
-      }
-      
-      // Proceed with deletion
-      const response = await api.delete(`/loan/${loanId}`, { 
-        data: { forceDelete } 
-      });
-      
-      setLoans((prev) => prev.filter((loan) => loan._id !== loanId));
-      
-      // Show detailed success message with cleanup summary
-      if (response.data.financialCleanup) {
-        const cleanup = response.data.financialCleanup;
-        toast.success(
-          `Loan deleted successfully! Also removed ${cleanup.deletedTransactions} financial transactions and ${cleanup.deletedTaxRecords} tax records.`,
-          { duration: 5000 }
-        );
-      } else {
-        toast.success("Loan deleted successfully!");
-      }
-      
-      return { success: true, financialCleanup: response.data.financialCleanup };
-    } catch (error) {
-      if (error.response?.data?.requiresConfirmation) {
-        // Handle case where backend requires additional confirmation
-        const { validation } = error.response.data;
-        const forceConfirmed = window.confirm(
-          `⚠️ CRITICAL WARNING: This deletion has significant financial implications:\n\n` +
-          `Warnings:\n${validation.warnings.join('\n')}\n\n` +
-          `Errors:\n${validation.errors.join('\n')}\n\n` +
-          `Recommendations:\n${validation.recommendations.join('\n')}\n\n` +
-          `Do you want to FORCE DELETE despite these warnings? This action cannot be undone.`
-        );
-        
-        if (forceConfirmed) {
-          return await deleteLoan(loanId, true); // Retry with force delete
-        } else {
-          return { cancelled: true };
-        }
-      }
-      
-      const result = handlePermissionError(error, "delete loans");
-      throw new Error(result.message);
-    }
-  };
+  // Removed updateLoan, updateLoanStatus, deleteLoan - this is a savings system
 
   const fetchBranches = async (forceRefresh = false) => {
     try {
@@ -845,112 +672,19 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Loan Product Functions
-  const fetchLoanProducts = async (filters = {}) => {
-    try {
-      const params = new URLSearchParams(filters);
-      const { data } = await api.get(`/loan-products?${params}`);
-      const products = data.data || [];
-      setLoanProducts(products);
-      return products;
-    } catch (error) {
-      console.error("Fetch loan products error:", error);
-      setLoanProducts([]);
-      return [];
-    }
-  };
-
-  const fetchActiveLoanProducts = async (branchId = null) => {
-    try {
-      const params = branchId ? `?branchId=${branchId}` : '';
-      const { data } = await api.get(`/loan-products/active${params}`);
-      return data.data || [];
-    } catch (error) {
-      console.error("Fetch active loan products error:", error);
-      return [];
-    }
-  };
-
-  const getLoanProduct = async (id) => {
-    try {
-      const { data } = await api.get(`/loan-products/${id}`);
-      return data.data;
-    } catch (error) {
-      console.error("Get loan product error:", error);
-      throw new Error(error.response?.data?.message || "Failed to fetch loan product");
-    }
-  };
-
-  const createLoanProduct = async (productData) => {
-    try {
-      const { data } = await api.post("/loan-products", productData);
-      toast.success("Loan product created successfully");
-      // Refresh loan products list
-      await fetchLoanProducts();
-      return data.data;
-    } catch (error) {
-      const message = error.response?.data?.message || "Failed to create loan product";
-      toast.error(message);
-      throw error;
-    }
-  };
-
-  const updateLoanProduct = async (id, productData) => {
-    try {
-      const { data } = await api.put(`/loan-products/${id}`, productData);
-      toast.success("Loan product updated successfully");
-      // Refresh loan products list
-      await fetchLoanProducts();
-      return data.data;
-    } catch (error) {
-      const message = error.response?.data?.message || "Failed to update loan product";
-      toast.error(message);
-      throw error
-    }
-  };
-
-  const deleteLoanProduct = async (id) => {
-    try {
-      await api.delete(`/loan-products/${id}`);
-      toast.success("Loan product deleted successfully");
-      // Refresh loan products list
-      await fetchLoanProducts();
-    } catch (error) {
-      const message = error.response?.data?.message || "Failed to delete loan product";
-      toast.error(message);
-      throw error;
-    }
-  };
-
-  const calculateLoanDetails = async (productId, amount, duration) => {
-    try {
-      const { data } = await api.post(`/loan-products/${productId}/calculate`, {
-        productId,
-        amount,
-        duration
-      });
-      return data.data;
-    } catch (error) {
-      const message = error.response?.data?.message || "Failed to calculate loan details";
-      toast.error(message);
-      throw error;
-    }
-  };
+  // Removed all loan product functions - this is a savings system
 
   return (
     <AppContext.Provider
               value={{
           user,
-          loans,
           customers,
           branches,
           users,
           notifications,
-          loanProducts,
           loading,
           error,
         customersLoading,
-        loansLoading,
         branchesLoading,
         usersLoading,
         notificationsLoading,
@@ -966,12 +700,6 @@ export const AppProvider = ({ children }) => {
         fetchSingleCustomer,
         updateCustomer,
         deleteCustomer,
-        fetchLoans,
-        createLoan,
-        fetchSingleLoan,
-        updateLoan,
-        updateLoanStatus,
-        deleteLoan,
         fetchBranches,
         createBranch,
         updateBranch,
@@ -985,13 +713,6 @@ export const AppProvider = ({ children }) => {
         updateProfile,
         deleteProfilePicture,
         changeUserPassword,
-        fetchLoanProducts,
-        fetchActiveLoanProducts,
-        getLoanProduct,
-        createLoanProduct,
-        updateLoanProduct,
-        deleteLoanProduct,
-        calculateLoanDetails,
       }}
     >
       {loading ? (

@@ -30,6 +30,7 @@ import { authorize } from './middleware/rbac.js';
 import { startReminderScheduler } from './utils/reminderScheduler.js';
 import notificationRouter from './routes/notificationRoute.js';
 import healthRouter from './routes/healthRoute.js';
+import systemSettingsRouter from './routes/systemSettingsRoute.js';
 import { upload } from './utils/upload.js';
 import multer from 'multer';
 import mongoose from 'mongoose';
@@ -257,7 +258,7 @@ app.post('/api/cache/clear/:entityType?', async (req, res) => {
 
 // 🚀 Redis Caching for API Routes
 // Apply Redis caching to read-heavy endpoints (with in-memory fallback)
-app.use('/api/loan/list', redisCacheMiddleware(120)); // 2 minutes
+// app.use('/api/loan/list', redisCacheMiddleware(120)); // 2 minutes - removed as this is a savings system
 app.use('/api/customer/list', redisCacheMiddleware(180)); // 3 minutes
 
 // 🧠 Memory Optimization and Monitoring
@@ -298,7 +299,7 @@ app.use('/api/user/list', redisCacheMiddleware(300)); // 5 minutes
 app.use('/api/activity/summary', redisCacheMiddleware(60)); // 1 minute
 app.use('/api/expense/list', redisCacheMiddleware(120)); // 2 minutes
 app.use('/api/branch/list', redisCacheMiddleware(300)); // 5 minutes
-app.use('/api/loan-products', redisCacheMiddleware(600)); // 10 minutes
+// app.use('/api/loan-products', redisCacheMiddleware(600)); // 10 minutes - removed as this is a savings system
 
 // Utility Functions
 const sanitizeFilename = (name) => name.replace(/[^a-zA-Z0-9-_.]/g, '_').substring(0, 100).toLowerCase();
@@ -527,6 +528,7 @@ app.use('/api/device-verifications', deviceVerificationRouter);
 app.use('/api/customers', savingsCustomerRouter);
 app.use('/api/user', userRouter);
 app.use('/api/notifications', notificationRouter);
+app.use('/api/system-settings', systemSettingsRouter);
 app.use('/api', healthRouter);
 
 // Error handling middleware for multer

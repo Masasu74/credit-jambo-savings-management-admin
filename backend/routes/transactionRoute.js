@@ -8,7 +8,8 @@ import {
   getCustomerTransactionSummary,
   getDailyTransactionReport,
   getTransactionStats,
-  cancelTransaction
+  cancelTransaction,
+  getRecentTransactions
 } from '../controllers/transactionController.js';
 import auth from '../middleware/auth.js';
 import { authorize } from '../middleware/rbac.js';
@@ -23,6 +24,9 @@ router.post('/deposit', authorize(['admin', 'manager', 'staff']), processDeposit
 
 // Process withdrawal transaction
 router.post('/withdrawal', authorize(['admin', 'manager', 'staff']), processWithdrawal);
+
+// Get recent transactions
+router.get('/recent', authorize(['admin', 'manager', 'staff']), getRecentTransactions);
 
 // Get transaction by ID
 router.get('/:id', authorize(['admin', 'manager', 'staff']), getTransactionById);
