@@ -1,0 +1,30 @@
+{
+  "name": "ndfi-track",
+  "version": "1.0.0",
+  "description": "NDFI TRACK - A comprehensive financial management platform",
+  "scripts": {
+    "dev": "npm run dev:all",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:logs:backend": "docker-compose logs -f backend",
+    "docker:logs:frontend": "docker-compose logs -f frontend",
+    "docker:ps": "docker-compose ps",
+    "docker:restart": "docker-compose restart",
+    "docker:clean": "docker-compose down -v && docker system prune -f",
+    "docker:rebuild": "docker-compose down && docker-compose up -d --build",
+    "docker:backend:shell": "docker-compose exec backend sh",
+    "docker:db:shell": "docker-compose exec mongodb mongosh -u admin -p changeme",
+    "docker:redis:shell": "docker-compose exec redis redis-cli",
+    "dev:backend": "cd backend && npm run server",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:all": "npm run docker:up && concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "build:all": "cd backend && npm install && cd ../frontend && npm install && npm run build"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5",
+    "concurrently": "^8.2.2"
+  }
+}

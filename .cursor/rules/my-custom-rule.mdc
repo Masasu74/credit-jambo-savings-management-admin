@@ -1,0 +1,9 @@
+---
+alwaysApply: true
+---
+rules:
+  - match: "**/*.{ts,tsx}"
+    action: >
+      Before generating or updating a page, inspect the existing files of the same type (controllers, routes, models, pages)
+      in the project. Mirror their structure, use their naming conventions, replicate their code organization style, and 
+      ensure consistent patterns in logic and layout. Do not introduce new styles or formats unless necessary or approved.

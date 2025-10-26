@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+*/node_modules/
+**/node_modules/
+
+# Cache directories
+.cache/
+**/.cache/
+*.cache
+
+# Backup files
+backups/
+*/backups/
+*.backup
+*.bak
+*.gz
+
+# Upload files
+uploads/
+*/uploads/
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Large files
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build outputs
+dist/
+build/
+*/dist/
+*/build/
+
+# Coverage
+coverage/
+*.lcov
+
+# Temporary files
+tmp/
+temp/

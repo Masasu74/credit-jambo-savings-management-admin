@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: ndfis-management-system-frontend
+    env: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    routes:
+      - type: rewrite
+        source: "/*"
+        destination: "/index.html"
+    headers:
+      - path: "/*"
+        name: "Cache-Control"
+        value: "no-cache, no-store, must-revalidate"
+      - path: "/*"
+        name: "X-Frame-Options"
+        value: "DENY"
+      - path: "/*"
+        name: "X-XSS-Protection"
+        value: "1; mode=block"

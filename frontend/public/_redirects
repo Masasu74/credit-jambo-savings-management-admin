@@ -1,0 +1,20 @@
+# Handle client-side routing for SPA
+/*    /index.html   200
+
+# Additional fallback rules
+/dashboard    /index.html   200
+/loan-products/*    /index.html   200
+/hr/*    /index.html   200
+/customers/*    /index.html   200
+/loans/*    /index.html   200
+/expenses/*    /index.html   200
+/reports/*    /index.html   200
+/notifications/*    /index.html   200
+/attendance/*    /index.html   200
+/tasks/*    /index.html   200
+/financial-management/*    /index.html   200
+/activity-logs    /index.html   200
+/enhanced-audit-trail    /index.html   200
+/session-management    /index.html   200
+/system-settings    /index.html   200
+/credit-scoring    /index.html   200

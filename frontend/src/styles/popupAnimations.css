@@ -1,0 +1,133 @@
+/* Custom animations for confirmation popup */
+
+/* Entrance animation for popup */
+@keyframes popupSlideIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Exit animation for popup */
+@keyframes popupSlideOut {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+}
+
+/* Position change animation */
+@keyframes positionChange {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Smooth backdrop fade */
+@keyframes backdropFadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes backdropFadeOut {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Enhanced pulse animation for position changes */
+@keyframes enhancedPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  }
+  50% {
+    transform: scale(1.01);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* Apply animations */
+.popup-entering {
+  animation: popupSlideIn 0.3s ease-out forwards;
+}
+
+.popup-exiting {
+  animation: popupSlideOut 0.3s ease-in forwards;
+}
+
+.popup-position-changing {
+  animation: positionChange 0.3s ease-in-out;
+}
+
+.backdrop-entering {
+  animation: backdropFadeIn 0.3s ease-out forwards;
+}
+
+.backdrop-exiting {
+  animation: backdropFadeOut 0.3s ease-in forwards;
+}
+
+.popup-enhanced-pulse {
+  animation: enhancedPulse 0.3s ease-in-out;
+}
+
+/* Smooth transitions for all popup elements */
+.popup-content {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Hover effects for buttons */
+.popup-button {
+  transition: all 0.2s ease-in-out;
+  transform: translateY(0);
+}
+
+.popup-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.popup-button:active {
+  transform: translateY(0);
+  transition: all 0.1s ease-in-out;
+}
+
+/* Responsive animations */
+@media (max-width: 640px) {
+  @keyframes popupSlideIn {
+    0% {
+      opacity: 0;
+      transform: scale(0.95) translateY(-10px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+  
+  .popup-entering {
+    animation: popupSlideIn 0.25s ease-out forwards;
+  }
+}
