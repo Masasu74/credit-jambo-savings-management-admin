@@ -92,9 +92,9 @@ const AlertsPanel = () => {
 
     // New customers this week
     const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const newCustomers = customers.filter(customer => 
+    const newCustomers = Array.isArray(customers) ? customers.filter(customer => 
       new Date(customer.createdAt) > oneWeekAgo
-    );
+    ) : [];
     if (newCustomers.length > 0) {
       newAlerts.push({
         id: 'new-customers',

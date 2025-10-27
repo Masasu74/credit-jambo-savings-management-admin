@@ -6,7 +6,8 @@ import {
   FaClock,
   FaEye,
   FaMobile,
-  FaDesktop
+  FaDesktop,
+  FaArrowLeft
 } from 'react-icons/fa';
 
 const DeviceVerifications = () => {
@@ -34,8 +35,8 @@ const DeviceVerifications = () => {
       }
       
       const data = await response.json();
-      // Ensure verifications is always an array
-      const verificationsData = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
+      // The backend returns data in this format: { success: true, data: { verifications: [...], pagination: {...} } }
+      const verificationsData = data.success && data.data?.verifications ? data.data.verifications : [];
       setVerifications(verificationsData);
     } catch (err) {
       setError(err.message);
@@ -66,12 +67,19 @@ const DeviceVerifications = () => {
     }
   };
 
-  const getStatusBadge = (isVerified) => {
-    if (isVerified) {
+  const getStatusBadge = (status) => {
+    if (status === 'verified') {
       return (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
           <FaCheckCircle className="w-3 h-3 mr-1" />
           Verified
+        </span>
+      );
+    } else if (status === 'rejected') {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+          <FaTimesCircle className="w-3 h-3 mr-1" />
+          Rejected
         </span>
       );
     } else {
@@ -95,8 +103,9 @@ const DeviceVerifications = () => {
 
   const filteredVerifications = (verifications || []).filter(verification => {
     if (filter === 'all') return true;
-    if (filter === 'verified') return verification.isVerified;
-    if (filter === 'pending') return !verification.isVerified;
+    if (filter === 'verified') return verification.status === 'verified';
+    if (filter === 'pending') return verification.status === 'pending';
+    if (filter === 'rejected') return verification.status === 'rejected';
     return true;
   });
 
@@ -137,7 +146,7 @@ const DeviceVerifications = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <div className="bg-white overflow-hidden shadow rounded-lg">
           <div className="p-5">
             <div className="flex items-center">
@@ -168,7 +177,7 @@ const DeviceVerifications = () => {
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">Verified</dt>
                   <dd className="text-lg font-medium text-gray-900">
-                    {(verifications || []).filter(v => v.isVerified).length}
+                    {(verifications || []).filter(v => v.status === 'verified').length}
                   </dd>
                 </dl>
               </div>
@@ -188,7 +197,27 @@ const DeviceVerifications = () => {
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">Pending</dt>
                   <dd className="text-lg font-medium text-gray-900">
-                    {(verifications || []).filter(v => !v.isVerified).length}
+                    {(verifications || []).filter(v => v.status === 'pending').length}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="p-5">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 rounded-md bg-red-500">
+                  <FaTimesCircle className="w-5 h-5 text-white m-1.5" />
+                </div>
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Rejected</dt>
+                  <dd className="text-lg font-medium text-gray-900">
+                    {(verifications || []).filter(v => v.status === 'rejected').length}
                   </dd>
                 </dl>
               </div>
@@ -201,7 +230,7 @@ const DeviceVerifications = () => {
       <div className="bg-white px-4 py-3 shadow rounded-lg">
         <div className="flex items-center space-x-4">
           <div className="flex space-x-2">
-            {['all', 'pending', 'verified'].map((filterType) => (
+            {['all', 'pending', 'verified', 'rejected'].map((filterType) => (
               <button
                 key={filterType}
                 onClick={() => setFilter(filterType)}
@@ -252,7 +281,7 @@ const DeviceVerifications = () => {
                         <p className="text-sm font-medium text-gray-900">
                           {verification.deviceName || 'Unknown Device'}
                         </p>
-                        {getStatusBadge(verification.isVerified)}
+                        {getStatusBadge(verification.status)}
                       </div>
                       <div className="flex items-center mt-1">
                         <p className="text-sm text-gray-500">
@@ -287,7 +316,7 @@ const DeviceVerifications = () => {
                       >
                         <FaEye className="h-5 w-5" />
                       </Link>
-                      {!verification.isVerified && (
+                      {verification.status === 'pending' && (
                         <div className="flex space-x-1">
                           <button
                             onClick={() => handleVerification(verification.id, 'approve')}
@@ -304,6 +333,15 @@ const DeviceVerifications = () => {
                             <FaTimesCircle className="h-5 w-5" />
                           </button>
                         </div>
+                      )}
+                      {verification.status === 'rejected' && (
+                        <button
+                          onClick={() => handleVerification(verification.id, 'revert')}
+                          className="text-blue-600 hover:text-blue-800"
+                          title="Revert to Pending"
+                        >
+                          <FaArrowLeft className="h-5 w-5" />
+                        </button>
                       )}
                     </div>
                   </div>

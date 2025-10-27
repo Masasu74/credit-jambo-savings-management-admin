@@ -28,9 +28,9 @@ export const SystemSettingsProvider = ({ children }) => {
     contactPhone: '+250 788 268 451',
     contactAddress: 'NM 233 St, Nyamagumba Musanze – Rwanda',
     website: 'https://creditjambo.com',
-    logo: getUploadUrl('logo.png'),
-    favicon: getUploadUrl('favicon.png'),
-    loginBackground: getUploadUrl('login-background.png'),
+    logo: '/logo.png',
+    favicon: '/main-favicon.png',
+    loginBackground: '/login-background.png',
     primaryColor: '#00b050',
     secondaryColor: '#008238',
     accentColor: '#6bc96b',
@@ -53,6 +53,82 @@ export const SystemSettingsProvider = ({ children }) => {
     }
   };
 
+  // Apply colors to CSS custom properties immediately
+  const applyColors = (colorSettings) => {
+    const root = document.documentElement;
+    
+    // Ensure we have valid color values with fallbacks
+    const primaryColor = colorSettings.primaryColor || '#00b050';
+    const secondaryColor = colorSettings.secondaryColor || '#008238';
+    const accentColor = colorSettings.accentColor || '#6bc96b';
+    const successColor = colorSettings.successColor || '#00b050';
+    const warningColor = colorSettings.warningColor || '#f59e0b';
+    const errorColor = colorSettings.errorColor || '#ef4444';
+    
+    // Set CSS custom properties
+    root.style.setProperty('--primary-color', primaryColor);
+    root.style.setProperty('--secondary-color', secondaryColor);
+    root.style.setProperty('--accent-color', accentColor);
+    root.style.setProperty('--success-color', successColor);
+    root.style.setProperty('--warning-color', warningColor);
+    root.style.setProperty('--error-color', errorColor);
+    
+    // Store colors in localStorage for persistence
+    localStorage.setItem('systemColors', JSON.stringify({
+      primaryColor,
+      secondaryColor,
+      accentColor,
+      successColor,
+      warningColor,
+      errorColor
+    }));
+    
+    console.log('SystemSettingsContext: Applied system colors:', {
+      primary: primaryColor,
+      secondary: secondaryColor,
+      accent: accentColor,
+      success: successColor,
+      warning: warningColor,
+      error: errorColor
+    });
+    
+    // Force a re-render of components that use these colors
+    const event = new CustomEvent('systemSettingsUpdated', { 
+      detail: {
+        primaryColor,
+        secondaryColor,
+        accentColor,
+        successColor,
+        warningColor,
+        errorColor
+      }
+    });
+    window.dispatchEvent(event);
+    
+    // Force CSS recalculation by adding/removing a class
+    document.body.classList.add('settings-updated');
+    setTimeout(() => {
+      document.body.classList.remove('settings-updated');
+    }, 100);
+  };
+
+  // Load colors from localStorage immediately on mount
+  useEffect(() => {
+    const storedColors = localStorage.getItem('systemColors');
+    if (storedColors) {
+      try {
+        const colors = JSON.parse(storedColors);
+        applyColors(colors);
+      } catch (error) {
+        console.warn('Failed to parse stored colors:', error);
+        applyColors(defaultSettings);
+      }
+    } else {
+      // Apply default colors immediately
+      applyColors(defaultSettings);
+    }
+  }, []); // Run only once on mount
+
   const fetchSettings = async () => {
     try {
       setLoading(true);
@@ -61,14 +137,18 @@ export const SystemSettingsProvider = ({ children }) => {
       if (response.data.success) {
         console.log('System settings loaded successfully:', response.data.data);
         setSettings(response.data.data);
+        // Apply colors from API settings
+        applyColors(response.data.data);
       } else {
         console.log('Using default settings');
         setSettings(defaultSettings);
+        applyColors(defaultSettings);
       }
     } catch (error) {
       console.error('Error fetching system settings:', error);
       console.log('Using default settings due to error');
       setSettings(defaultSettings);
+      applyColors(defaultSettings);
     } finally {
       setLoading(false);
     }
@@ -79,6 +159,8 @@ export const SystemSettingsProvider = ({ children }) => {
       const response = await api.put('/system-settings', newSettings);
       if (response.data.success) {
         setSettings(response.data.data);
+        // Apply updated colors immediately
+        applyColors(response.data.data);
         toast.success('System settings updated successfully');
         return true;
       }
@@ -93,75 +175,6 @@ export const SystemSettingsProvider = ({ children }) => {
     fetchSettings();
   };
 
-  // Apply CSS custom properties for colors
-  useEffect(() => {
-    if (settings) {
-      const root = document.documentElement;
-      
-      // Ensure we have valid color values with fallbacks
-      const primaryColor = settings.primaryColor || '#374151';
-      const secondaryColor = settings.secondaryColor || '#111827';
-      const accentColor = settings.accentColor || '#6b7280';
-      const successColor = settings.successColor || '#10b981';
-      const warningColor = settings.warningColor || '#f59e0b';
-      const errorColor = settings.errorColor || '#ef4444';
-      
-      // Set CSS custom properties
-      root.style.setProperty('--primary-color', primaryColor);
-      root.style.setProperty('--secondary-color', secondaryColor);
-      root.style.setProperty('--accent-color', accentColor);
-      root.style.setProperty('--success-color', successColor);
-      root.style.setProperty('--warning-color', warningColor);
-      root.style.setProperty('--error-color', errorColor);
-      
-      console.log('SystemSettingsContext: Applied system colors:', {
-        primary: primaryColor,
-        secondary: secondaryColor,
-        accent: accentColor,
-        success: successColor,
-        warning: warningColor,
-        error: errorColor
-      });
-      
-      // Also log the CSS custom properties
-      console.log('SystemSettingsContext: CSS custom properties set:', {
-        '--primary-color': getComputedStyle(document.documentElement).getPropertyValue('--primary-color'),
-        '--secondary-color': getComputedStyle(document.documentElement).getPropertyValue('--secondary-color'),
-        '--success-color': getComputedStyle(document.documentElement).getPropertyValue('--success-color')
-      });
-      
-      // Force a re-render of components that use these colors
-      const event = new CustomEvent('systemSettingsUpdated', { 
-        detail: {
-          primaryColor,
-          secondaryColor,
-          accentColor,
-          successColor,
-          warningColor,
-          errorColor
-        }
-      });
-      window.dispatchEvent(event);
-      
-      // Force CSS recalculation by adding/removing a class
-      document.body.classList.add('settings-updated');
-      setTimeout(() => {
-        document.body.classList.remove('settings-updated');
-      }, 100);
-      
-      // Update any inline styles that might be using the old colors
-      const styleElements = document.querySelectorAll('[style*="rgb(37, 99, 235)"]');
-      styleElements.forEach(element => {
-        const computedStyle = window.getComputedStyle(element);
-        if (computedStyle.backgroundColor === 'rgb(37, 99, 235)') {
-          element.style.backgroundColor = primaryColor;
-        }
-        if (computedStyle.color === 'rgb(37, 99, 235)') {
-          element.style.color = primaryColor;
-        }
-      });
-    }
-  }, [settings]);
 
   // Fetch settings on mount
   useEffect(() => {

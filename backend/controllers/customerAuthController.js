@@ -160,12 +160,7 @@ export const registerCustomer = async (req, res) => {
         id: newCustomer._id,
         customerCode: newCustomer.customerCode,
         fullName: newCustomer.personalInfo.fullName,
-        email: newCustomer.contact.email,
-        branch: {
-          id: branch._id,
-          name: branch.name,
-          code: branch.code
-        }
+        email: newCustomer.contact.email
       }
     });
   } catch (error) {
@@ -215,8 +210,7 @@ export const loginCustomer = async (req, res) => {
 
     // Find customer with password field
     const customer = await Customer.findOne({ 'contact.email': email.toLowerCase() })
-      .select('+password')
-      .populate('branch', 'name code alias');
+      .select('+password');
 
     if (!customer) {
       return res.status(401).json({
@@ -280,12 +274,6 @@ export const loginCustomer = async (req, res) => {
         fullName: customer.personalInfo.fullName,
         email: customer.contact.email,
         phone: customer.contact.phone,
-        branch: {
-          id: customer.branch._id,
-          name: customer.branch.name,
-          code: customer.branch.code,
-          alias: customer.branch.alias
-        },
         lastLogin: customer.lastLogin
       }
     });

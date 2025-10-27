@@ -35,7 +35,9 @@ const DepositFunds = () => {
       }
       
       const data = await response.json();
-      setAccounts(Array.isArray(data.data) ? data.data : []);
+      // The backend returns data in this format: { success: true, data: { accounts: [...], pagination: {...} } }
+      const accountsData = data.success && data.data?.accounts ? data.data.accounts : [];
+      setAccounts(accountsData);
     } catch (err) {
       console.error('Error fetching accounts:', err);
       setError(err.message);

@@ -83,34 +83,28 @@ const CustomerList = () => {
       render: (item) => item.customerCode || "N/A"
     },
     {
-      key: "personalInfo.fullName",
+      key: "fullName",
       header: "Full Name",
-      render: (item) => item.personalInfo?.fullName || "N/A"
+      render: (item) => item.fullName || "N/A"
     },
     {
-      key: "contact.email",
+      key: "email",
       header: "Email",
-      render: (item) => item.contact?.email || "N/A"
+      render: (item) => item.email || "N/A"
     },
     {
-      key: "employment.status",
-      header: "Employment",
+      key: "deviceVerified",
+      header: "Device Verified",
       render: (item) => {
-        const status = item.employment?.status;
+        const verified = item.deviceVerified;
         let backgroundColor, color;
         
-        if (status === "Employed") {
+        if (verified === true) {
           backgroundColor = `${currentColors.success}20`;
           color = currentColors.success;
-        } else if (status === "Self-Employed") {
-          backgroundColor = `${currentColors.primary}20`;
-          color = currentColors.primary;
-        } else if (status === "Unemployed") {
+        } else {
           backgroundColor = `${currentColors.error}20`;
           color = currentColors.error;
-        } else {
-          backgroundColor = `${currentColors.secondary}20`;
-          color = currentColors.secondary;
         }
         
         return (
@@ -122,15 +116,39 @@ const CustomerList = () => {
               borderColor: color
             }}
           >
-            {status || "N/A"}
+            {verified ? "Verified" : "Pending"}
           </span>
         );
       }
     },
     {
-      key: "branch.name",
-      header: "Branch",
-      render: (item) => item.branch?.name || "N/A"
+      key: "isActive",
+      header: "Status",
+      render: (item) => {
+        const active = item.isActive;
+        let backgroundColor, color;
+        
+        if (active === true) {
+          backgroundColor = `${currentColors.success}20`;
+          color = currentColors.success;
+        } else {
+          backgroundColor = `${currentColors.error}20`;
+          color = currentColors.error;
+        }
+        
+        return (
+          <span
+            className="px-2 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap"
+            style={{
+              backgroundColor,
+              color,
+              borderColor: color
+            }}
+          >
+            {active ? "Active" : "Inactive"}
+          </span>
+        );
+      }
     },
     {
       key: "createdBy.fullName",
@@ -151,25 +169,21 @@ const CustomerList = () => {
 
   const filters = [
     {
-      key: "employment.status",
-      placeholder: "Employment Status",
+      key: "isActive",
+      placeholder: "Status",
       options: [
         { value: "", label: "All" },
-        { value: "Employed", label: "Employed" },
-        { value: "Self-Employed", label: "Self-Employed" },
-        { value: "Unemployed", label: "Unemployed" }
+        { value: "true", label: "Active" },
+        { value: "false", label: "Inactive" }
       ]
     },
     {
-      key: "contact.address.province",
-      placeholder: "Province",
+      key: "deviceVerified",
+      placeholder: "Device Verification",
       options: [
-        { value: "", label: "All Provinces" },
-        { value: "Kigali", label: "Kigali" },
-        { value: "Northern", label: "Northern" },
-        { value: "Southern", label: "Southern" },
-        { value: "Eastern", label: "Eastern" },
-        { value: "Western", label: "Western" }
+        { value: "", label: "All" },
+        { value: "true", label: "Verified" },
+        { value: "false", label: "Pending" }
       ]
     }
   ];

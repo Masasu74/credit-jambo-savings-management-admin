@@ -3,32 +3,42 @@ import { Link, useNavigate, Navigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAppContext } from "../context/AppContext";
 import { useSystemSettings } from "../context/SystemSettingsContext";
-import { useSystemColors } from "../hooks/useSystemColors";
 import logo from "../assets/logo.png";
 import login_background from "../assets/login-background.png";
 import Loader from "../components/Loader";
 
 const Login = () => {
-  const { user,login, loading } = useAppContext();
+  const { user, login, loading, error, retryAuth } = useAppContext();
   const { settings } = useSystemSettings();
-  const { colors } = useSystemColors();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fallback colors
-  const fallbackColors = {
-    primary: '#00b050',
-    secondary: '#008238',
-    accent: '#6bc96b',
-    success: '#00b050',
-    warning: '#f59e0b',
-    error: '#ef4444'
+  // Get colors from settings with fallback
+  const getColors = () => {
+    if (settings) {
+      return {
+        primary: settings.primaryColor || '#00b050',
+        secondary: settings.secondaryColor || '#008238',
+        accent: settings.accentColor || '#6bc96b',
+        success: settings.successColor || '#00b050',
+        warning: settings.warningColor || '#f59e0b',
+        error: settings.errorColor || '#ef4444'
+      };
+    }
+    return {
+      primary: '#00b050',
+      secondary: '#008238',
+      accent: '#6bc96b',
+      success: '#00b050',
+      warning: '#f59e0b',
+      error: '#ef4444'
+    };
   };
 
-  const currentColors = colors || fallbackColors;
+  const currentColors = getColors();
 
   if (user) {
     return <Navigate to="/dashboard" replace />;
@@ -73,6 +83,24 @@ const Login = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full max-w-xs">
+          {/* Error Display */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
+              <div className="flex items-center justify-between">
+                <p className="text-red-700 text-sm">{error}</p>
+                {error.includes("Authentication check failed") && (
+                  <button
+                    type="button"
+                    onClick={retryAuth}
+                    className="text-red-600 hover:text-red-800 text-sm font-medium underline ml-2"
+                  >
+                    Retry
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col gap-2">
             <label htmlFor="email">
               Email <span className="text-red-500">*</span>

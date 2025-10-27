@@ -33,8 +33,8 @@ const DynamicFavicon = () => {
           faviconType = 'image/x-icon';
         }
       } else {
-        // Fallback to default favicon
-        faviconUrl = getUploadUrl('favicon.png');
+        // Fallback to default favicon - serve from public directory
+        faviconUrl = '/main-favicon.png';
         faviconType = 'image/png';
       }
       

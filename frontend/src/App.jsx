@@ -50,7 +50,17 @@ import Login from './pages/Login';
 
 // Protected Route Component with Suspense
 const ProtectedRoute = () => {
-  const { user } = useAppContext();
+  const { user, loading } = useAppContext();
+  
+  // Show loading while authentication is being checked
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2" style={{borderColor: '#00b050'}}></div>
+      </div>
+    );
+  }
+  
   return user ? (
     <RootLayout>
       <ScrollToTop />

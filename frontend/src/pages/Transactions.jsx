@@ -33,8 +33,8 @@ const Transactions = () => {
       }
       
       const data = await response.json();
-      // Ensure transactions is always an array
-      const transactionsData = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
+      // The backend returns data in this format: { success: true, data: { transactions: [...], pagination: {...} } }
+      const transactionsData = data.success && data.data?.transactions ? data.data.transactions : [];
       setTransactions(transactionsData);
     } catch (err) {
       setError(err.message);
@@ -94,7 +94,7 @@ const Transactions = () => {
 
   const filteredTransactions = (transactions || []).filter(transaction => {
     if (filter === 'all') return true;
-    return transaction.transactionType === filter;
+    return transaction.type === filter;
   });
 
   if (loading) {
@@ -181,7 +181,7 @@ const Transactions = () => {
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">Total Deposits</dt>
                   <dd className="text-lg font-medium text-gray-900">
-                    {(transactions || []).filter(t => t.transactionType === 'deposit').length}
+                    {(transactions || []).filter(t => t.type === 'deposit').length}
                   </dd>
                 </dl>
               </div>
@@ -201,7 +201,7 @@ const Transactions = () => {
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">Total Withdrawals</dt>
                   <dd className="text-lg font-medium text-gray-900">
-                    {(transactions || []).filter(t => t.transactionType === 'withdrawal').length}
+                    {(transactions || []).filter(t => t.type === 'withdrawal').length}
                   </dd>
                 </dl>
               </div>
@@ -280,15 +280,15 @@ const Transactions = () => {
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-10 w-10">
                       <div className="h-10 w-10 rounded-full flex items-center justify-center bg-gray-100">
-                        {getTransactionIcon(transaction.transactionType)}
+                        {getTransactionIcon(transaction.type)}
                       </div>
                     </div>
                     <div className="ml-4">
                       <div className="flex items-center">
                         <p className="text-sm font-medium text-gray-900">
-                          {transaction.reference || `TXN-${transaction.id?.slice(-8)}`}
+                          {transaction.transactionId || transaction.reference || `TXN-${transaction.id?.slice(-8)}`}
                         </p>
-                        {getTransactionBadge(transaction.transactionType, transaction.status)}
+                        {getTransactionBadge(transaction.type, transaction.status)}
                         {getStatusBadge(transaction.status)}
                       </div>
                       <div className="flex items-center mt-1">
@@ -305,9 +305,9 @@ const Transactions = () => {
                   <div className="flex items-center space-x-4">
                     <div className="text-right">
                       <p className={`text-sm font-medium ${
-                        transaction.transactionType === 'deposit' ? 'text-green-600' : 'text-red-600'
+                        transaction.type === 'deposit' ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {transaction.transactionType === 'deposit' ? '+' : '-'}
+                        {transaction.type === 'deposit' ? '+' : '-'}
                         {transaction.amount?.toLocaleString() || 0} RWF
                       </p>
                       <p className="text-xs text-gray-500">

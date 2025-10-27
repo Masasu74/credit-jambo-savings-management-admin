@@ -167,18 +167,18 @@ const EnhancedCharts = () => {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
       
-      const monthCustomers = customers.filter(customer => {
+      const monthCustomers = Array.isArray(customers) ? customers.filter(customer => {
         const customerDate = new Date(customer.createdAt);
         return customerDate.getMonth() === date.getMonth() && customerDate.getFullYear() === date.getFullYear();
-      });
+      }) : [];
       
       acquisition.push({
         month: monthKey,
         newCustomers: monthCustomers.length,
-        totalCustomers: customers.filter(customer => {
+        totalCustomers: Array.isArray(customers) ? customers.filter(customer => {
           const customerDate = new Date(customer.createdAt);
           return customerDate <= date;
-        }).length
+        }).length : 0
       });
     }
     

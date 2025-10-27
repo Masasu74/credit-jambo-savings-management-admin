@@ -3,22 +3,22 @@
 @tailwind utilities;
 
 :root {
-  --primary-color: #2563eb;
-  --secondary-color: #64748b;
-  --accent-color: #f59e0b;
-  --success-color: #10b981;
+  --primary-color: #00b050;
+  --secondary-color: #008238;
+  --accent-color: #6bc96b;
+  --success-color: #00b050;
   --warning-color: #f59e0b;
   --error-color: #ef4444;
 }
 
 /* Dark mode variables */
 .dark {
-  --primary-color: #3b82f6;
-  --secondary-color: #94a3b8;
-  --accent-color: #fbbf24;
-  --success-color: #34d399;
-  --warning-color: #fbbf24;
-  --error-color: #f87171;
+  --primary-color: #00b050;
+  --secondary-color: #008238;
+  --accent-color: #6bc96b;
+  --success-color: #00b050;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
 }
 
 /* Enhanced scrollbar styling */

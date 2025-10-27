@@ -33,8 +33,8 @@ const SavingsAccounts = () => {
       }
       
       const data = await response.json();
-      // Ensure accounts is always an array
-      const accountsData = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
+      // The backend returns data in this format: { success: true, data: { accounts: [...], pagination: {...} } }
+      const accountsData = data.success && data.data?.accounts ? data.data.accounts : [];
       setAccounts(accountsData);
     } catch (err) {
       setError(err.message);
@@ -254,7 +254,7 @@ const SavingsAccounts = () => {
                       </div>
                       <div className="flex items-center mt-1">
                         <p className="text-sm text-gray-500">
-                          {account.customerId?.fullName || 'Unknown Customer'}
+                          {account.customer?.fullName || account.customerId?.fullName || 'Unknown Customer'}
                         </p>
                         <span className="mx-2">•</span>
                         {getAccountTypeBadge(account.accountType)}

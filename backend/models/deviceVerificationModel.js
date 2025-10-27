@@ -62,12 +62,10 @@ const deviceVerificationSchema = new mongoose.Schema({
   },
   verificationCode: {
     type: String,
-    required: true,
     unique: true
   },
   verificationExpiry: {
-    type: Date,
-    required: true
+    type: Date
   },
   verifiedAt: {
     type: Date

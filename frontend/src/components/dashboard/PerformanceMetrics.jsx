@@ -57,14 +57,14 @@ const PerformanceMetrics = () => {
     ));
 
     // Growth Rate: Based on recent customer and loan growth (simulated)
-    const recentCustomers = customers.filter(customer => {
+    const recentCustomers = Array.isArray(customers) ? customers.filter(customer => {
       const createdDate = new Date(customer.createdAt);
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       return createdDate > thirtyDaysAgo;
-    }).length;
+    }).length : 0;
     
     const growthRate = Math.max(-10, Math.min(50, 
-      (recentCustomers / Math.max(1, customers.length)) * 100
+      (recentCustomers / Math.max(1, Array.isArray(customers) ? customers.length : 0)) * 100
     ));
 
     // Efficiency: Based on loan processing speed (simulated)

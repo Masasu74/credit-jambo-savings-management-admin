@@ -381,7 +381,7 @@ const CustomerDetails = () => {
                 
         <div>
                   <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
-            {customer.personalInfo?.fullName}
+            {customer.fullName || customer.personalInfo?.fullName}
           </h1>
                   <p className="text-gray-600 dark:text-gray-300">Customer ID: {customer._id}</p>
                   <div className="flex items-center gap-4 mt-2">
@@ -451,14 +451,14 @@ const CustomerDetails = () => {
             <div className="flex items-center justify-between mb-2">
               <span className="text-gray-600 dark:text-gray-300 font-medium block">Email</span>
               <button
-                onClick={() => copyToClipboard(customer.contact?.email)}
+                onClick={() => copyToClipboard(customer.email || customer.contact?.email)}
                 className="text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1"
               >
                 <FaCopy size={12} />
                 Copy
               </button>
             </div>
-            <span className="text-gray-900 dark:text-white font-semibold font-mono text-sm">{customer.contact?.email}</span>
+            <span className="text-gray-900 dark:text-white font-semibold font-mono text-sm">{customer.email || customer.contact?.email}</span>
           </div>
           
           <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">

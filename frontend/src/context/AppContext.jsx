@@ -190,10 +190,36 @@ export const AppProvider = ({ children }) => {
     };
   }, [user, lastActivity, checkInactivity]);
 
+  // Add retry mechanism for authentication
+  const retryAuth = useCallback(async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return false;
+    
+    try {
+      const { data } = await api.get("/user/me");
+      setUser(data.user);
+      setError(null); // Clear any previous errors
+      const now = Date.now();
+      setLastActivity(now);
+      localStorage.setItem('lastActivity', now.toString());
+      setShouldLoadPriority(true);
+      return true;
+    } catch (error) {
+      if (error.response?.status === 401) {
+        localStorage.removeItem("token");
+        setUser(null);
+        setError("Session expired. Please log in again.");
+        return false;
+      }
+      return false;
+    }
+  }, [api]);
+
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const token = localStorage.getItem("token");
+        
         if (token) {
           try {
             const { data } = await api.get("/user/me");
@@ -210,13 +236,20 @@ export const AppProvider = ({ children }) => {
               setUser(null);
               setError("Session expired. Please log in again.");
             } else {
-              // For other errors (network, etc.), keep the token but show error
+              // For other errors (network, 500, etc.), keep the token but show error
+              console.warn("Authentication check failed:", authError.message);
               setError(authError.response?.data?.message || "Authentication check failed");
+              // Don't clear user state for network errors - let them retry
             }
           }
+        } else {
+          // No token found, ensure user is null
+          setUser(null);
         }
       } catch (error) {
+        console.error("Authentication check error:", error);
         setError(error.message || "Authentication failed");
+        // Don't clear user state for unexpected errors
       } finally {
         setLoading(false);
       }
@@ -376,7 +409,7 @@ export const AppProvider = ({ children }) => {
       const { data } = await api.get(url);
       
       if (data && data.success) {
-        setCustomers(data.data || []);
+        setCustomers(data.data?.customers || []);
       } else {
         console.error("❌ fetchCustomers error: Invalid response", data);
         setError(data?.message || 'Failed to fetch customers');
@@ -672,6 +705,18 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const createSavingsAccount = async (accountData) => {
+    try {
+      const { data } = await api.post("/savings-accounts", accountData);
+      toast.success("Savings account created successfully!");
+      return { success: true, data: data.data };
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || "Failed to create savings account";
+      toast.error(errorMessage);
+      return { success: false, message: errorMessage };
+    }
+  };
+
   // Removed all loan product functions - this is a savings system
 
   return (
@@ -692,6 +737,7 @@ export const AppProvider = ({ children }) => {
         register,
         login,
         logout,
+        retryAuth, // Add retry authentication function
         updateActivity, // Add activity tracking function
         fetchUsers,
         fetchStaff,
@@ -713,6 +759,7 @@ export const AppProvider = ({ children }) => {
         updateProfile,
         deleteProfilePicture,
         changeUserPassword,
+        createSavingsAccount,
       }}
     >
       {loading ? (

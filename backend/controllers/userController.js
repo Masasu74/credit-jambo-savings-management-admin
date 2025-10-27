@@ -226,8 +226,9 @@ const listResponsibleOfficers = async (req, res) => {
 
 const getCurrentUser = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("-password");
-    res.status(200).json({ success: true, user });
+    // req.user is already the full user object from auth middleware
+    // No need to fetch again, just return it
+    res.status(200).json({ success: true, user: req.user });
   } catch (error) {
     res.status(500).json({ success: false, message: "Server Error" });
   }

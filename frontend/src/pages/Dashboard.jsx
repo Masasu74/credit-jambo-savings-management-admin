@@ -96,7 +96,8 @@ const Dashboard = () => {
   // Calculate savings management statistics
   const totalCustomers = Array.isArray(customers) ? customers.length : 0;
   const verifiedCustomers = Array.isArray(customers) ? customers.filter(customer => customer.deviceVerified).length : 0;
-  const pendingVerifications = Array.isArray(customers) ? customers.filter(customer => !customer.deviceVerified).length : 0;
+  const pendingVerifications = Array.isArray(customers) ? customers.filter(customer => customer.deviceVerified === false).length : 0;
+  const rejectedVerifications = Array.isArray(customers) ? customers.filter(customer => customer.deviceVerified === 'rejected').length : 0;
   const activeSavingsAccounts = savingsStats.activeAccounts || 0;
   const totalSavingsBalance = savingsStats.totalBalance || 0;
   const totalDeposits = savingsStats.totalDeposits || 0;
@@ -126,7 +127,7 @@ const Dashboard = () => {
 
   const recentTransactionsData = recentTransactions.slice(0, 5).map(transaction => ({
     id: transaction._id,
-    customer: transaction.customer?.personalInfo?.fullName || "Unknown",
+    customer: transaction.customer?.fullName || transaction.customer?.personalInfo?.fullName || "Unknown",
     type: transaction.transactionType,
     amount: formatCurrency(transaction.amount),
     date: new Date(transaction.createdAt).toLocaleDateString(),
@@ -139,9 +140,9 @@ const Dashboard = () => {
         .slice(0, 5)
         .map(customer => ({
           id: customer._id,
-          name: customer.personalInfo?.fullName || "Unknown",
-          email: customer.contact?.email || "N/A",
-          phone: customer.contact?.phone || "N/A",
+          name: customer.fullName || "Unknown",
+          email: customer.email || "N/A",
+          phone: customer.phone || "N/A",
           verified: customer.deviceVerified ? "Yes" : "No",
           date: new Date(customer.createdAt).toLocaleDateString()
         }))
@@ -192,6 +193,13 @@ const Dashboard = () => {
                 subtitle="Awaiting admin approval"
                 icon={<FaShieldAlt size={18} className="text-yellow-500" />}
                 description="Customer device verifications pending admin approval"
+              />
+              <DashCard
+                title="Rejected Verifications"
+                number={rejectedVerifications.toString()}
+                subtitle="Require attention"
+                icon={<FaShieldAlt size={18} className="text-red-500" />}
+                description="Customer device verifications that were rejected and may need review"
               />
               <DashCard
                 title="Active Savings Accounts"

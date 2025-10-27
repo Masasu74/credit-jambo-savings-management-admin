@@ -234,25 +234,28 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
                   {!isCollapsed && (
                     <div className={`overflow-hidden transition-all duration-300 ${activeMenu === item.name ? 'max-h-screen' : 'max-h-0'}`}>
                       <div className={`ml-8 pl-4 space-y-2 border-l-2 border-gray-300 dark:border-gray-600 mt-2 overflow-y-auto sidebar-submenu-scrollbar ${item.name === 'Loans' ? 'loans-submenu' : 'max-h-80'}`}>
-                        {item.submenus?.map((sub) => (
-                          <NavLink
-                            key={sub.name}
-                            to={sub.path}
-                            className={({ isActive }) =>
-                              `block p-3 text-xs rounded-lg transition-all duration-200 font-medium
-                              ${isActive
+                        {item.submenus?.map((sub) => {
+                          // Check if this specific submenu item is active
+                          const isSubmenuActive = location.pathname === sub.path;
+                          
+                          return (
+                            <NavLink
+                              key={sub.name}
+                              to={sub.path}
+                              className={`block p-3 text-xs rounded-lg transition-all duration-200 font-medium
+                              ${isSubmenuActive
                                 ? 'font-bold shadow-md'
-                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:shadow-sm'}`
-                            }
-                            style={({ isActive }) => ({
-                              backgroundColor: isActive ? `${currentColors.primary}15` : 'transparent',
-                              color: isActive ? currentColors.primary : undefined
-                            })}
-                            onClick={() => setIsMobileMenuOpen(false)}
-                          >
-                            {sub.name}
-                          </NavLink>
-                        ))}
+                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:shadow-sm'}`}
+                              style={{
+                                backgroundColor: isSubmenuActive ? `${currentColors.primary}15` : 'transparent',
+                                color: isSubmenuActive ? currentColors.primary : undefined
+                              }}
+                              onClick={() => setIsMobileMenuOpen(false)}
+                            >
+                              {sub.name}
+                            </NavLink>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
