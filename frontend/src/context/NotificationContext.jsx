@@ -2,6 +2,9 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAppContext } from './AppContext';
 import notificationSounds from '../utils/notificationSounds';
 
+// Feature flag: disable in-app notifications API entirely
+const IN_APP_NOTIFICATIONS_ENABLED = false;
+
 const NotificationContext = createContext();
 
 export const useNotifications = () => {
@@ -21,8 +24,8 @@ export const NotificationProvider = ({ children }) => {
 
   // Fetch notifications
   const fetchNotifications = async (page = 1, limit = 20) => {
-    // Don't fetch if user is not authenticated
-    if (!user) {
+    // Disabled or not authenticated: no-op
+    if (!IN_APP_NOTIFICATIONS_ENABLED || !user) {
       return;
     }
 
@@ -39,7 +42,11 @@ export const NotificationProvider = ({ children }) => {
       
       setUnreadCount(pagination.unreadCount);
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      // Silently fail if notifications endpoint doesn't exist
+      if (error.response?.status !== 404) {
+        console.error('Error fetching notifications:', error);
+      }
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -47,8 +54,8 @@ export const NotificationProvider = ({ children }) => {
 
   // Fetch notification count for navbar
   const fetchNotificationCount = async () => {
-    // Don't fetch if user is not authenticated
-    if (!user) {
+    // Disabled or not authenticated: no-op
+    if (!IN_APP_NOTIFICATIONS_ENABLED || !user) {
       return;
     }
 
@@ -67,14 +74,18 @@ export const NotificationProvider = ({ children }) => {
         setIsInitialized(true);
       }
     } catch (error) {
-      console.error('Error fetching notification count:', error);
+      // Silently fail if notifications endpoint doesn't exist
+      if (error.response?.status !== 404) {
+        console.error('Error fetching notification count:', error);
+      }
+      setUnreadCount(0);
     }
   };
 
   // Mark notification as read
   const markAsRead = async (notificationId) => {
-    // Don't proceed if user is not authenticated
-    if (!user) {
+    // Disabled or not authenticated: no-op
+    if (!IN_APP_NOTIFICATIONS_ENABLED || !user) {
       return;
     }
 
@@ -99,8 +110,8 @@ export const NotificationProvider = ({ children }) => {
 
   // Mark all notifications as read
   const markAllAsRead = async () => {
-    // Don't proceed if user is not authenticated
-    if (!user) {
+    // Disabled or not authenticated: no-op
+    if (!IN_APP_NOTIFICATIONS_ENABLED || !user) {
       return;
     }
 
@@ -120,8 +131,8 @@ export const NotificationProvider = ({ children }) => {
 
   // Delete notification (admin only)
   const deleteNotification = async (notificationId) => {
-    // Don't proceed if user is not authenticated
-    if (!user) {
+    // Disabled or not authenticated: no-op
+    if (!IN_APP_NOTIFICATIONS_ENABLED || !user) {
       return;
     }
 
@@ -145,8 +156,8 @@ export const NotificationProvider = ({ children }) => {
 
   // Dismiss notification
   const dismissNotification = async (notificationId) => {
-    // Don't proceed if user is not authenticated
-    if (!user) {
+    // Disabled or not authenticated: no-op
+    if (!IN_APP_NOTIFICATIONS_ENABLED || !user) {
       return;
     }
 
@@ -170,7 +181,7 @@ export const NotificationProvider = ({ children }) => {
 
   // Clear notifications when user logs out
   useEffect(() => {
-    if (!user) {
+    if (!IN_APP_NOTIFICATIONS_ENABLED || !user) {
       setNotifications([]);
       setUnreadCount(0);
       setIsInitialized(false);
@@ -179,8 +190,8 @@ export const NotificationProvider = ({ children }) => {
 
   // Auto-refresh notification count every 60 seconds with visual feedback
   useEffect(() => {
-    // Only start intervals if user is authenticated
-    if (!user) {
+    // Only start intervals if enabled and user is authenticated
+    if (!IN_APP_NOTIFICATIONS_ENABLED || !user) {
       return;
     }
 
@@ -195,8 +206,8 @@ export const NotificationProvider = ({ children }) => {
 
   // Real-time updates for new notifications (every 20 seconds)
   useEffect(() => {
-    // Only start intervals if user is authenticated
-    if (!user) {
+    // Only start intervals if enabled and user is authenticated
+    if (!IN_APP_NOTIFICATIONS_ENABLED || !user) {
       return;
     }
 

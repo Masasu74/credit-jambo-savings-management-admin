@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAppContext } from '../context/AppContext';
 import { 
   FaArrowUp,
   FaCheckCircle,
@@ -8,6 +9,7 @@ import {
 } from 'react-icons/fa';
 
 const WithdrawFunds = () => {
+  const { api } = useAppContext();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     accountId: '',
@@ -22,21 +24,12 @@ const WithdrawFunds = () => {
 
   useEffect(() => {
     fetchAccounts();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAccounts = async () => {
     try {
-      const response = await fetch('/api/savings-accounts', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch accounts');
-      }
-      
-      const data = await response.json();
+      const { data } = await api.get('/savings-accounts');
       // The backend returns data in this format: { success: true, data: { accounts: [...], pagination: {...} } }
       const accountsData = data.success && data.data?.accounts ? data.data.accounts : [];
       setAccounts(accountsData);
@@ -71,26 +64,21 @@ const WithdrawFunds = () => {
     }
 
     try {
-      const response = await fetch('/api/transactions/withdraw', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
+      const { data } = await api.post('/transactions/withdrawal', formData);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Withdrawal failed');
+      // Handle successful withdrawal - the backend returns the transaction data
+      if (data && data.success !== false) {
+        setSuccess(true);
+        setTimeout(() => {
+          navigate('/transactions');
+        }, 2000);
+      } else {
+        setError(data?.message || 'Withdrawal failed');
       }
-
-      setSuccess(true);
-      setTimeout(() => {
-        navigate('/transactions');
-      }, 2000);
     } catch (err) {
-      setError(err.message);
+      console.error('Withdrawal error details:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Withdrawal failed';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

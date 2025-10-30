@@ -15,13 +15,14 @@ import {
 export const processDeposit = async (req, res) => {
   try {
     const { accountId, amount, description, reference } = req.body;
-    const processedBy = req.user.id;
+    const processedBy = req.user._id;
     const deviceId = req.headers['x-device-id'] || 'unknown';
-    const ipAddress = req.ip || req.connection.remoteAddress;
+    const ipAddress = (req.ip || req.connection?.remoteAddress || 'unknown').toString();
     const userAgent = req.headers['user-agent'] || '';
 
-    // Validate amount
-    if (!amount || amount <= 0) {
+    // Normalize and validate amount
+    const amountNumber = Number(amount);
+    if (!amountNumber || Number.isNaN(amountNumber) || amountNumber <= 0) {
       return res.status(400).json({
         success: false,
         message: 'Invalid deposit amount'
@@ -38,7 +39,7 @@ export const processDeposit = async (req, res) => {
     }
 
     // Check if deposit is allowed
-    const canDeposit = account.canDeposit(amount);
+    const canDeposit = account.canDeposit(amountNumber);
     if (!canDeposit.allowed) {
       return res.status(400).json({
         success: false,
@@ -56,8 +57,8 @@ export const processDeposit = async (req, res) => {
     }
 
     // Update account balance
-    const balanceBefore = account.balance;
-    account.balance += amount;
+    const balanceBefore = Number(account.balance) || 0;
+    account.balance = balanceBefore + amountNumber;
     account.lastTransactionDate = new Date();
     await account.save();
 
@@ -66,9 +67,9 @@ export const processDeposit = async (req, res) => {
       accountId,
       customerId: account.customerId,
       type: 'deposit',
-      amount,
-      balanceBefore,
-      balanceAfter: account.balance,
+      amount: amountNumber,
+      balanceBefore: balanceBefore,
+      balanceAfter: Number(account.balance),
       description: description || 'Deposit transaction',
       reference,
       processedBy,
@@ -80,6 +81,9 @@ export const processDeposit = async (req, res) => {
 
     await transaction.save();
 
+    // Populate the saved transaction to ensure all fields are accessible
+    await transaction.populate('customerId', 'personalInfo.fullName customerCode');
+
     res.status(201).json({
       success: true,
       message: 'Deposit processed successfully',
@@ -90,10 +94,15 @@ export const processDeposit = async (req, res) => {
     });
   } catch (error) {
     console.error('Error processing deposit:', error);
+    console.error('Error stack:', error.stack);
+    if (error.errors) {
+      console.error('Validation errors:', error.errors);
+    }
     res.status(500).json({
       success: false,
       message: 'Failed to process deposit',
-      error: error.message
+      error: error.message,
+      details: error.errors || undefined
     });
   }
 };
@@ -102,7 +111,7 @@ export const processDeposit = async (req, res) => {
 export const processWithdrawal = async (req, res) => {
   try {
     const { accountId, amount, description, reference } = req.body;
-    const processedBy = req.user.id;
+    const processedBy = req.user._id;
     const deviceId = req.headers['x-device-id'] || 'unknown';
     const ipAddress = req.ip || req.connection.remoteAddress;
     const userAgent = req.headers['user-agent'] || '';
@@ -143,8 +152,8 @@ export const processWithdrawal = async (req, res) => {
     }
 
     // Update account balance
-    const balanceBefore = account.balance;
-    account.balance -= amount;
+    const balanceBefore = Number(account.balance) || 0;
+    account.balance = balanceBefore - Number(amount);
     account.lastTransactionDate = new Date();
     await account.save();
 
@@ -153,9 +162,9 @@ export const processWithdrawal = async (req, res) => {
       accountId,
       customerId: account.customerId,
       type: 'withdrawal',
-      amount,
-      balanceBefore,
-      balanceAfter: account.balance,
+      amount: Number(amount),
+      balanceBefore: balanceBefore,
+      balanceAfter: Number(account.balance),
       description: description || 'Withdrawal transaction',
       reference,
       processedBy,
@@ -167,6 +176,9 @@ export const processWithdrawal = async (req, res) => {
 
     await transaction.save();
 
+    // Populate the saved transaction to ensure all fields are accessible
+    await transaction.populate('customerId', 'personalInfo.fullName customerCode');
+
     res.status(201).json({
       success: true,
       message: 'Withdrawal processed successfully',
@@ -177,10 +189,15 @@ export const processWithdrawal = async (req, res) => {
     });
   } catch (error) {
     console.error('Error processing withdrawal:', error);
+    console.error('Error stack:', error.stack);
+    if (error.errors) {
+      console.error('Validation errors:', error.errors);
+    }
     res.status(500).json({
       success: false,
       message: 'Failed to process withdrawal',
-      error: error.message
+      error: error.message,
+      details: error.errors || undefined
     });
   }
 };

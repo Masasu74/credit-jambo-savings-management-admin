@@ -1,8 +1,8 @@
 services:
   - type: web
-    name: ndfis-management-system-frontend
+    name: credit-jambo-admin-frontend
     env: static
-    buildCommand: cd frontend && npm install && npm run build
+    buildCommand: cd frontend && npm ci && npm run build
     staticPublishPath: ./frontend/dist
     routes:
       - type: rewrite
@@ -18,3 +18,23 @@ services:
       - path: "/*"
         name: "X-XSS-Protection"
         value: "1; mode=block"
+
+  - type: web
+    name: credit-jambo-admin-backend
+    env: node
+    plan: starter
+    buildCommand: cd backend && npm ci
+    startCommand: cd backend && node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: REDIS_URL
+        sync: false
+      - key: ENABLE_CLOUDINARY
+        value: "false"

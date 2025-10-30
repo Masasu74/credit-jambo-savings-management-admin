@@ -16,7 +16,7 @@ import { transactionSummaryDTO } from '../dtos/transactionDTO.js';
 export const createSavingsAccount = async (req, res) => {
   try {
     const { customerId, productId, accountType = 'regular', minimumBalance, interestRate } = req.body;
-    const createdBy = req.user.id;
+    const createdBy = req.user._id;
 
     // Check if customer exists
     const customer = await Customer.findById(customerId);

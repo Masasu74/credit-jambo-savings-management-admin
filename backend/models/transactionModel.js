@@ -5,7 +5,12 @@ const transactionSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true,
-    index: true
+    index: true,
+    default: function() {
+      const timestamp = Date.now().toString().slice(-10);
+      const random = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+      return `TXN${timestamp}${random}`;
+    }
   },
   accountId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -94,14 +99,8 @@ transactionSchema.index({ type: 1, status: 1 });
 transactionSchema.index({ createdAt: -1 });
 transactionSchema.index({ transactionId: 1 });
 
-// Pre-save middleware to generate transaction ID
+// Keep updatedAt fresh on save
 transactionSchema.pre('save', async function(next) {
-  if (this.isNew && !this.transactionId) {
-    // Generate transaction ID: TXN + timestamp + random 6 digits
-    const timestamp = Date.now().toString().slice(-10);
-    const random = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
-    this.transactionId = `TXN${timestamp}${random}`;
-  }
   this.updatedAt = new Date();
   next();
 });

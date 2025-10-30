@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAppContext } from '../context/AppContext';
 import { 
   FaArrowDown,
   FaCheckCircle,
   FaTimesCircle
 } from 'react-icons/fa';
+import { toast } from 'react-toastify';
 
 const DepositFunds = () => {
+  const { api } = useAppContext();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     accountId: '',
@@ -20,21 +23,12 @@ const DepositFunds = () => {
 
   useEffect(() => {
     fetchAccounts();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAccounts = async () => {
     try {
-      const response = await fetch('/api/savings-accounts', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch accounts');
-      }
-      
-      const data = await response.json();
+      const { data } = await api.get('/savings-accounts');
       // The backend returns data in this format: { success: true, data: { accounts: [...], pagination: {...} } }
       const accountsData = data.success && data.data?.accounts ? data.data.accounts : [];
       setAccounts(accountsData);
@@ -51,26 +45,24 @@ const DepositFunds = () => {
     setError(null);
 
     try {
-      const response = await fetch('/api/transactions/deposit', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
+      const { data } = await api.post('/transactions/deposit', formData);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Deposit failed');
+      // Handle successful deposit - the backend returns the transaction data
+      if (data && data.success !== false) {
+        toast.success('Deposit processed successfully');
+        setSuccess(true);
+        setTimeout(() => {
+          navigate('/transactions');
+        }, 1500);
+      } else {
+        const msg = data?.message || 'Deposit failed';
+        toast.error(msg);
+        setError(null);
       }
-
-      setSuccess(true);
-      setTimeout(() => {
-        navigate('/transactions');
-      }, 2000);
     } catch (err) {
-      setError(err.message);
+      const errorMessage = err.response?.data?.message || err.message || 'Deposit failed';
+      toast.error(errorMessage);
+      setError(null);
     } finally {
       setLoading(false);
     }
@@ -123,17 +115,7 @@ const DepositFunds = () => {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                <div className="flex">
-                  <FaTimesCircle className="h-5 w-5 text-red-400" />
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-red-800">Error</h3>
-                    <div className="mt-2 text-sm text-red-700">{error}</div>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Errors are shown via toast to reduce on-page noise */}
 
             <div>
               <label htmlFor="accountId" className="block text-sm font-medium text-gray-700">

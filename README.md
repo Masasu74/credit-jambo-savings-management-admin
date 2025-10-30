@@ -1,4 +1,4 @@
-# Credit Jambo Admin Management System
+# Credit Jambo Savings Management Admin System
 
 A comprehensive admin panel for managing the Credit Jambo savings management system, built with React frontend and Node.js/Express backend.
 
@@ -122,6 +122,7 @@ cd credit-jambo-savings-management-admin
 
 2. Start all services:
 ```bash
+# From project root
 docker-compose up -d
 ```
 
@@ -142,10 +143,15 @@ docker-compose logs -f
 docker build -t credit-jambo-admin-backend ./backend
 docker run -p 4000:4000 credit-jambo-admin-backend
 
-# Build and run frontend
+# Build and run frontend (served by nginx on port 80 inside container)
 docker build -t credit-jambo-admin-frontend ./frontend
-docker run -p 3000:3000 credit-jambo-admin-frontend
+docker run -p 3001:80 credit-jambo-admin-frontend
 ```
+
+### Default Local URLs
+
+- Backend API: http://localhost:4000
+- Frontend App: http://localhost:3001
 
 ## API Endpoints
 
@@ -248,6 +254,25 @@ npm run build
 # Backend
 cd backend
 npm start
+
+## Deployment (Render)
+
+Render configuration is in `render.yaml` and defines two services:
+
+- `credit-jambo-admin-frontend` (Static) – builds from `frontend` and publishes `./frontend/dist`
+- `credit-jambo-admin-backend` (Web/Node) – installs and starts from `backend/server.js`
+
+Set environment variables on the backend service (e.g., `MONGODB_URI`, `JWT_SECRET`).
+
+## Admin Session Settings
+
+- Idle timeout can be configured via `frontend/.env`:
+
+```env
+VITE_IDLE_TIMEOUT_MINUTES=15
+```
+
+- When the token is close to expiry, the UI warns the user; after expiry or idle timeout, the user is logged out and redirected to login.
 ```
 
 ## Performance Features

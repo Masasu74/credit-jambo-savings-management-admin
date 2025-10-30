@@ -29,7 +29,8 @@ export const AppProvider = ({ children }) => {
 
   // Auto-logout functionality
   const [lastActivity, setLastActivity] = useState(Date.now());
-  const INACTIVITY_TIMEOUT = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
+  const INACTIVITY_TIMEOUT = (Number(import.meta.env.VITE_IDLE_TIMEOUT_MINUTES) || 15) * 60 * 1000; // default 15 minutes
+  const [tokenExpiry, setTokenExpiry] = useState(null);
   
 
 
@@ -96,33 +97,34 @@ export const AppProvider = ({ children }) => {
     axiosInstance.interceptors.response.use(
       (res) => res,
       (error) => {
-        // Debug error response (development only)
-        if (import.meta.env.MODE === 'development') {
-          console.error('🔧 API Error:', {
-            status: error.response?.status,
-            statusText: error.response?.statusText,
-            data: error.response?.data,
-            config: {
-              method: error.config?.method,
-              url: error.config?.url,
-              baseURL: error.config?.baseURL
-            }
+        const status = error.response?.status;
+        const url = error.config?.url || '';
+
+        // Silently ignore optional notification endpoints (avoid console noise on 404)
+        if (status === 404 && url.startsWith('/in-app-notifications')) {
+          return Promise.reject(error);
+        }
+
+        // Minimal debug logging in development (avoid flooding console)
+        if (import.meta.env.MODE === 'development' && status !== 404) {
+          console.warn('🔧 API Error:', {
+            status,
+            message: error.response?.data?.message || error.message,
+            url,
           });
         }
         
         // Handle authentication and permission errors globally
-        const status = error.response?.status;
-        
         if (status === 401) {
           // Check if this is a customer API call - don't interfere with customer authentication
-          const isCustomerAPI = error.config?.url?.includes('/customer-auth/') || 
-                               error.config?.url?.includes('/customer-portal/');
+          const isCustomerAPI = url.includes('/customer-auth/') || url.includes('/customer-portal/');
           
           if (!isCustomerAPI) {
-            // Only handle staff authentication errors
-            // Don't clear token immediately - let the component handle it
-            // This prevents logout on page refresh
-            console.warn("Authentication error - token may be invalid");
+            // Force logout on admin auth errors
+            localStorage.removeItem("token");
+            setUser(null);
+            toast.error("Session expired. Please log in again.");
+            try { window.location.href = '/login'; } catch (_) {}
           }
           // For customer API calls, let the customer components handle the error
         } else if (status === 403) {
@@ -159,7 +161,7 @@ export const AppProvider = ({ children }) => {
     
     if (timeSinceLastActivity >= INACTIVITY_TIMEOUT && user && !isCustomerPage) {
       logout();
-      toast.warning("You have been logged out due to inactivity (6 hours). Please log in again.");
+      toast.warning("Logged out due to inactivity. Please log in again.");
     }
   }, [INACTIVITY_TIMEOUT, lastActivity, user]);
 
@@ -225,6 +227,12 @@ export const AppProvider = ({ children }) => {
             const now = Date.now();
             setLastActivity(now); // Set initial activity time
             localStorage.setItem('lastActivity', now.toString());
+            // Decode token expiry
+            try {
+              const [, payloadBase64] = token.split('.');
+              const payload = JSON.parse(atob(payloadBase64));
+              if (payload?.exp) setTokenExpiry(payload.exp * 1000);
+            } catch (_) {}
             // Signal a secondary effect to load priority data
             setShouldLoadPriority(true);
           } catch (authError) {
@@ -254,6 +262,26 @@ export const AppProvider = ({ children }) => {
     };
     checkAuth();
   }, [api]);
+
+  // Proactive token expiry watcher (no refresh endpoint; warn and logout)
+  useEffect(() => {
+    if (!tokenExpiry || !user) return;
+    const warnThresholdMs = 60 * 1000; // 1 minute before expiry
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const remaining = tokenExpiry - now;
+      if (remaining <= 0) {
+        logout();
+        toast.error("Session expired. Please log in again.");
+        try { window.location.href = '/login'; } catch (_) {}
+      } else if (remaining <= warnThresholdMs) {
+        toast.warn("Your session will expire soon. Please save your work.");
+      }
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [tokenExpiry, user]);
 
   const sendNotification = async ({ customerId, types, message, purpose, loanId }) => {
     try {
@@ -355,6 +383,12 @@ export const AppProvider = ({ children }) => {
       const now = Date.now();
       setLastActivity(now); // Set initial activity time on login
       localStorage.setItem('lastActivity', now.toString());
+      // Capture token expiry
+      try {
+        const [, payloadBase64] = data.token.split('.');
+        const payload = JSON.parse(atob(payloadBase64));
+        if (payload?.exp) setTokenExpiry(payload.exp * 1000);
+      } catch (_) {}
       toast.success("Login successful! Welcome back.");
       return { success: true };
     } catch (error) {

@@ -4,7 +4,7 @@ services:
   # MongoDB Database
   mongodb:
     image: mongo:7
-    container_name: ndfis-mongodb
+    container_name: credit-jambo-mongodb
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
@@ -17,7 +17,7 @@ services:
     ports:
       - "${MONGO_PORT:-27017}:27017"
     networks:
-      - ndfis-network
+      - credit-jambo-network
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
       interval: 10s
@@ -29,7 +29,7 @@ services:
   # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: ndfis-redis
+    container_name: credit-jambo-redis
     restart: unless-stopped
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
@@ -37,7 +37,7 @@ services:
     ports:
       - "${REDIS_PORT:-6379}:6379"
     networks:
-      - ndfis-network
+      - credit-jambo-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -51,7 +51,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: production
-    container_name: ndfis-backend
+    container_name: credit-jambo-admin-backend
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-production}
@@ -85,7 +85,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - ndfis-network
+      - credit-jambo-network
     deploy:
       resources:
         limits:
@@ -107,14 +107,14 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: production
-    container_name: ndfis-frontend
+    container_name: credit-jambo-admin-frontend
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-3001}:80"
     depends_on:
       - backend
     networks:
-      - ndfis-network
+      - credit-jambo-network
     deploy:
       resources:
         limits:
@@ -139,6 +139,6 @@ volumes:
     driver: local
 
 networks:
-  ndfis-network:
+  credit-jambo-network:
     driver: bridge
 
