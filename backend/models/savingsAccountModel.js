@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const savingsAccountSchema = new mongoose.Schema({
   accountNumber: {
     type: String,
-    required: true,
+    required: false,
     unique: true,
     index: true
   },
@@ -15,9 +15,20 @@ const savingsAccountSchema = new mongoose.Schema({
   },
   accountType: {
     type: String,
-    enum: ['regular', 'premium', 'fixed'],
+    enum: ['regular', 'premium', 'fixed', 'youth', 'senior', 'business'],
     default: 'regular',
     required: true
+  },
+  productId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AccountProduct',
+    required: false,
+    index: true
+  },
+  productCode: {
+    type: String,
+    required: false,
+    index: true
   },
   balance: {
     type: Number,
@@ -71,6 +82,9 @@ const savingsAccountSchema = new mongoose.Schema({
 savingsAccountSchema.index({ customerId: 1, status: 1 });
 savingsAccountSchema.index({ accountNumber: 1 });
 savingsAccountSchema.index({ status: 1, createdAt: -1 });
+savingsAccountSchema.index({ productId: 1, status: 1 });
+// Unique constraint: A customer can only have one account per product (only when productId is set)
+savingsAccountSchema.index({ customerId: 1, productId: 1 }, { unique: true, sparse: true });
 
 // Pre-save middleware to generate account number
 savingsAccountSchema.pre('save', async function(next) {

@@ -1,6 +1,7 @@
 import SavingsAccount from '../models/savingsAccountModel.js';
 import Customer from '../models/customerModel.js';
 import Transaction from '../models/transactionModel.js';
+import AccountProduct from '../models/accountProductModel.js';
 import { 
   savingsAccountSummaryDTO, 
   savingsAccountDetailsDTO, 
@@ -14,7 +15,7 @@ import { transactionSummaryDTO } from '../dtos/transactionDTO.js';
 // Create a new savings account
 export const createSavingsAccount = async (req, res) => {
   try {
-    const { customerId, accountType = 'regular', minimumBalance = 0, interestRate = 0 } = req.body;
+    const { customerId, productId, accountType = 'regular', minimumBalance, interestRate } = req.body;
     const createdBy = req.user.id;
 
     // Check if customer exists
@@ -26,29 +27,55 @@ export const createSavingsAccount = async (req, res) => {
       });
     }
 
-    // Check if customer already has a savings account
-    const existingAccount = await SavingsAccount.findOne({ customerId });
-    if (existingAccount) {
-      return res.status(400).json({
-        success: false,
-        message: 'Customer already has a savings account'
-      });
+    // Get product details if productId is provided
+    let product = null;
+    if (productId) {
+      product = await AccountProduct.findById(productId);
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          message: 'Account product not found'
+        });
+      }
+      if (!product.isActive) {
+        return res.status(400).json({
+          success: false,
+          message: 'This account product is not active'
+        });
+      }
     }
+
+    // Check if customer already has an account for this product
+    if (productId) {
+      const existingAccount = await SavingsAccount.findOne({ 
+        customerId, 
+        productId 
+      });
+      
+      if (existingAccount) {
+        return res.status(400).json({
+          success: false,
+          message: 'Customer already has an account for this product'
+        });
+      }
+    }
+
+    // Use product settings or provided values
+    const finalMinimumBalance = minimumBalance !== undefined ? minimumBalance : (product?.minimumBalance || 0);
+    const finalInterestRate = interestRate !== undefined ? interestRate : (product?.interestRate || 0);
 
     // Create new savings account
     const savingsAccount = new SavingsAccount({
       customerId,
+      productId: productId || null,
+      productCode: product?.productCode || '',
       accountType,
-      minimumBalance,
-      interestRate,
+      minimumBalance: finalMinimumBalance,
+      interestRate: finalInterestRate,
       createdBy
     });
 
     await savingsAccount.save();
-
-    // Update customer with savings account reference
-    customer.savingsAccount = savingsAccount._id;
-    await customer.save();
 
     res.status(201).json({
       success: true,
@@ -57,6 +84,15 @@ export const createSavingsAccount = async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating savings account:', error);
+    
+    // Handle duplicate product account error
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Customer already has an account for this product'
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Failed to create savings account',
@@ -94,6 +130,7 @@ export const getSavingsAccounts = async (req, res) => {
 
     const accounts = await SavingsAccount.find(query)
       .populate('customerId', 'customerCode personalInfo.fullName contact.email contact.phone')
+      .populate('productId', 'productCode productName accountType interestRate')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -148,30 +185,32 @@ export const getSavingsAccountById = async (req, res) => {
   }
 };
 
-// Get savings account by customer ID
+// Get all savings accounts by customer ID (supports multiple accounts per customer)
 export const getSavingsAccountByCustomer = async (req, res) => {
   try {
     const { customerId } = req.params;
 
-    const account = await SavingsAccount.findOne({ customerId })
-      .populate('customerId', 'customerCode personalInfo.fullName contact.email contact.phone');
+    const accounts = await SavingsAccount.find({ customerId })
+      .populate('customerId', 'customerCode personalInfo.fullName contact.email contact.phone')
+      .populate('productId', 'productCode productName accountType interestRate minimumBalance features')
+      .sort({ createdAt: -1 });
 
-    if (!account) {
+    if (!accounts || accounts.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'Savings account not found for this customer'
+        message: 'No savings accounts found for this customer'
       });
     }
 
     res.json({
       success: true,
-      data: savingsAccountWithCustomerDTO(account, account.customerId)
+      data: accounts.map(account => savingsAccountWithCustomerDTO(account, account.customerId))
     });
   } catch (error) {
-    console.error('Error fetching customer savings account:', error);
+    console.error('Error fetching customer savings accounts:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch customer savings account',
+      message: 'Failed to fetch customer savings accounts',
       error: error.message
     });
   }
@@ -328,13 +367,30 @@ export const getSavingsAccountStats = async (req, res) => {
       balance: { $lt: 1000 }
     });
 
+    // Get transaction stats
+    const transactionStats = await Transaction.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalDeposits: {
+            $sum: { $cond: [{ $eq: ['$type', 'deposit'] }, '$amount', 0] }
+          },
+          totalWithdrawals: {
+            $sum: { $cond: [{ $eq: ['$type', 'withdrawal'] }, '$amount', 0] }
+          }
+        }
+      }
+    ]);
+
     const stats = {
       total,
       active,
       verified,
       totalBalance: balanceStats[0]?.totalBalance || 0,
       averageBalance: balanceStats[0]?.averageBalance || 0,
-      lowBalanceAccounts: lowBalanceCount
+      lowBalanceAccounts: lowBalanceCount,
+      totalDeposits: transactionStats[0]?.totalDeposits || 0,
+      totalWithdrawals: transactionStats[0]?.totalWithdrawals || 0
     };
 
     res.json({

@@ -9,7 +9,25 @@ export const savingsAccountSummaryDTO = (account) => {
     status: account.status,
     isVerified: account.isVerified,
     lastTransactionDate: account.lastTransactionDate,
-    createdAt: account.createdAt
+    createdAt: account.createdAt,
+    interestRate: account.interestRate,
+    // Include customer data if it exists
+    customer: account.customerId ? {
+      id: account.customerId._id,
+      customerCode: account.customerId.customerCode,
+      fullName: account.customerId.personalInfo?.fullName,
+      email: account.customerId.contact?.email,
+      phone: account.customerId.contact?.phone
+    } : null,
+    customerId: account.customerId,
+    // Include product data if it exists
+    product: account.productId ? {
+      id: account.productId._id,
+      productCode: account.productId.productCode,
+      productName: account.productId.productName,
+      accountType: account.productId.accountType,
+      interestRate: account.productId.interestRate
+    } : null
   };
 };
 
@@ -68,7 +86,9 @@ export const savingsAccountStatsDTO = (stats) => {
     totalBalance: stats.totalBalance,
     averageBalance: stats.averageBalance,
     lowBalanceAccounts: stats.lowBalanceAccounts,
-    verifiedAccounts: stats.verified
+    verifiedAccounts: stats.verified,
+    totalDeposits: stats.totalDeposits || 0,
+    totalWithdrawals: stats.totalWithdrawals || 0
   };
 };
 

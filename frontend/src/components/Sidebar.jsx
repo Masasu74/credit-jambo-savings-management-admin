@@ -9,7 +9,8 @@ import {
   FaBars,
   FaEllipsisV,
   FaClipboardList,
-  FaShieldAlt
+  FaShieldAlt,
+  FaBox
 } from "react-icons/fa";
 import { useAppContext } from "../context/AppContext";
 import { useSystemSettings } from "../context/SystemSettingsContext";
@@ -55,6 +56,9 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
     else if (pathname.startsWith('/device-verifications')) {
       setActiveMenu('Device Verifications');
     }
+    else if (pathname.startsWith('/account-products')) {
+      setActiveMenu('Account Products');
+    }
     // Removed references to deleted pages - keeping only core admin features
     else {
       setActiveMenu(null);
@@ -87,7 +91,8 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
       name: "Customers",
       icon: <FaUser size={20} style={{ color: currentColors.primary }} />,
       submenus: [
-        { name: "View all Customers", path: "/customers" }
+        { name: "View all Customers", path: "/customers" },
+        { name: "Add Customer", path: "/customers/add" }
       ]
     },
     {
@@ -112,6 +117,14 @@ const Sidebar = ({ isCollapsed = false, onToggle }) => {
       icon: <FaShieldAlt size={20} style={{ color: currentColors.primary }} />,
       submenus: [
         { name: "All Verifications", path: "/device-verifications" }
+      ]
+    },
+    {
+      name: "Account Products",
+      icon: <FaBox size={20} style={{ color: currentColors.primary }} />,
+      submenus: [
+        { name: "All Products", path: "/account-products" },
+        { name: "Add Product", path: "/account-products/add" }
       ]
     },
 

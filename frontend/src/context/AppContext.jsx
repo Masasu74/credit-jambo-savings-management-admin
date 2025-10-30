@@ -12,7 +12,6 @@ export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   // const [loans, setLoans] = useState([]); // Removed - this is a savings system, not a loan system
   const [customers, setCustomers] = useState([]);
-  const [branches, setBranches] = useState([]);
   const [users, setUsers] = useState([]);
   const [notifications, setNotifications] = useState([]);
   // const [loanProducts, setLoanProducts] = useState([]); // Removed - this is a savings system
@@ -25,7 +24,6 @@ export const AppProvider = ({ children }) => {
   // Individual loading states for better UX
   const [customersLoading, setCustomersLoading] = useState(false);
   // const [loansLoading, setLoansLoading] = useState(false); // Removed - this is a savings system
-  const [branchesLoading, setBranchesLoading] = useState(false);
   const [usersLoading, setUsersLoading] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
 
@@ -402,12 +400,15 @@ export const AppProvider = ({ children }) => {
   };
 
   const fetchCustomers = useCallback(async (forceRefresh = false) => {
+    const doFetch = async () => {
+      const url = forceRefresh ? `/customers?nocache=true&t=${Date.now()}` : "/customers";
+      return await api.get(url);
+    };
+
     try {
       setCustomersLoading(true);
-      // Add cache-busting parameter when force refresh is requested
-      const url = forceRefresh ? `/customers?nocache=true&t=${Date.now()}` : "/customers";
-      const { data } = await api.get(url);
-      
+      const { data } = await doFetch();
+
       if (data && data.success) {
         setCustomers(data.data?.customers || []);
       } else {
@@ -416,8 +417,22 @@ export const AppProvider = ({ children }) => {
         setCustomers([]);
       }
     } catch (error) {
+      const status = error.response?.status;
+      // Handle transient 404 on first navigation by retrying once shortly after
+      if (status === 404) {
+        try {
+          await new Promise(r => setTimeout(r, 300));
+          const { data } = await doFetch();
+          if (data && data.success) {
+            setCustomers(data.data?.customers || []);
+            return;
+          }
+        } catch (e) {
+          // fall through to error handling below
+        }
+      }
       console.error("❌ fetchCustomers error:", error);
-      setError(error.message);
+      setError(error.message || 'Failed to fetch customers');
       setCustomers([]);
     } finally {
       setCustomersLoading(false);
@@ -724,13 +739,11 @@ export const AppProvider = ({ children }) => {
               value={{
           user,
           customers,
-          branches,
           users,
           notifications,
           loading,
           error,
         customersLoading,
-        branchesLoading,
         usersLoading,
         notificationsLoading,
         api,
@@ -746,11 +759,6 @@ export const AppProvider = ({ children }) => {
         fetchSingleCustomer,
         updateCustomer,
         deleteCustomer,
-        fetchBranches,
-        createBranch,
-        updateBranch,
-        deleteBranch,
-        getBranchById,
         sendNotification,
         sendBulkNotification,
         fetchNotifications,

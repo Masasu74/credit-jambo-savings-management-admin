@@ -37,6 +37,14 @@ const DeviceVerificationDetails = () => {
   useEffect(() => {
     if (id && id !== 'undefined') {
       fetchVerificationDetails();
+      
+      // Set up auto-refresh every 3 seconds
+      const interval = setInterval(() => {
+        fetchVerificationDetails();
+      }, 3000);
+      
+      // Cleanup interval on component unmount
+      return () => clearInterval(interval);
     } else {
       setError('Invalid verification ID');
       navigate('/device-verifications');
@@ -155,6 +163,34 @@ const DeviceVerificationDetails = () => {
     }
   };
 
+  const handleRevokeVerified = async () => {
+    try {
+      setActionLoading(true);
+      
+      const response = await fetch(`/api/device-verifications/${id}/verify`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'revoke' })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to revoke verification');
+      }
+      
+      toast.success('Device verification revoked successfully');
+      await fetchVerificationDetails(); // Refresh data
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setActionLoading(false);
+      setShowPopup(false);
+    }
+  };
+
   const getStatusBadge = (status) => {
     const statusConfig = {
       'verified': { color: 'bg-green-100 text-green-800', icon: FaCheckCircle },
@@ -216,6 +252,9 @@ const DeviceVerificationDetails = () => {
         break;
       case 'revert':
         await handleRevertRejected();
+        break;
+      case 'revoke':
+        await handleRevokeVerified();
         break;
       default:
         break;
@@ -295,19 +334,34 @@ const DeviceVerificationDetails = () => {
               )}
               
               {verification.status === 'verified' && (
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setPopupMessage('Are you sure you want to suspend this device?');
-                    setActionType('suspend');
-                    setShowPopup(true);
-                  }}
-                  loading={actionLoading}
-                  className="flex items-center gap-2"
-                >
-                  <FaBan />
-                  Suspend Device
-                </Button>
+                <>
+                  <Button
+                    variant="warning"
+                    onClick={() => {
+                      setPopupMessage('Are you sure you want to revoke this device verification? This will require the customer to re-verify their device.');
+                      setActionType('revoke');
+                      setShowPopup(true);
+                    }}
+                    loading={actionLoading}
+                    className="flex items-center gap-2"
+                  >
+                    <FaTimesCircle />
+                    Revoke Verification
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setPopupMessage('Are you sure you want to suspend this device?');
+                      setActionType('suspend');
+                      setShowPopup(true);
+                    }}
+                    loading={actionLoading}
+                    className="flex items-center gap-2"
+                  >
+                    <FaBan />
+                    Suspend Device
+                  </Button>
+                </>
               )}
               
               {verification.status === 'rejected' && (
@@ -427,7 +481,10 @@ const DeviceVerificationDetails = () => {
               <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <span className="text-gray-600 dark:text-gray-300 font-medium block mb-1">Location</span>
                 <span className="text-gray-900 dark:text-white font-semibold">
-                  {verification.location}
+                  {typeof verification.location === 'object' 
+                    ? `${verification.location.city || ''}, ${verification.location.region || ''}, ${verification.location.country || ''}`.replace(/^,\s*|,\s*$/g, '')
+                    : verification.location
+                  }
                 </span>
               </div>
             )}
@@ -447,28 +504,28 @@ const DeviceVerificationDetails = () => {
             <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <span className="text-gray-600 dark:text-gray-300 font-medium block mb-1">Customer Name</span>
               <span className="text-gray-900 dark:text-white font-semibold">
-                {verification.customerId?.fullName || verification.customer?.fullName || 'Unknown Customer'}
+                {verification.customer?.fullName || verification.customerId?.personalInfo?.fullName || 'Unknown Customer'}
               </span>
             </div>
             
             <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <span className="text-gray-600 dark:text-gray-300 font-medium block mb-1">Customer Code</span>
               <span className="text-gray-900 dark:text-white font-semibold font-mono">
-                {verification.customerId?.customerCode || verification.customer?.customerCode || 'N/A'}
+                {verification.customer?.customerCode || verification.customerId?.customerCode || 'N/A'}
               </span>
             </div>
             
             <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <span className="text-gray-600 dark:text-gray-300 font-medium block mb-1">Email</span>
               <span className="text-gray-900 dark:text-white font-semibold">
-                {verification.customerId?.email || verification.customer?.email || 'N/A'}
+                {verification.customer?.email || verification.customerId?.contact?.email || 'N/A'}
               </span>
             </div>
             
             <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <span className="text-gray-600 dark:text-gray-300 font-medium block mb-1">Phone</span>
               <span className="text-gray-900 dark:text-white font-semibold">
-                {verification.customerId?.phone || verification.customer?.phone || 'N/A'}
+                {verification.customer?.phone || verification.customerId?.contact?.phone || 'N/A'}
               </span>
             </div>
             
@@ -647,9 +704,9 @@ const DeviceVerificationDetails = () => {
         message={popupMessage}
         onConfirm={handleConfirmAction}
         onCancel={() => setShowPopup(false)}
-        confirmText={actionType === 'verify' ? 'Verify' : actionType === 'reject' ? 'Reject' : actionType === 'suspend' ? 'Suspend' : actionType === 'revert' ? 'Revert' : 'Reactivate'}
+        confirmText={actionType === 'verify' ? 'Verify' : actionType === 'reject' ? 'Reject' : actionType === 'suspend' ? 'Suspend' : actionType === 'revert' ? 'Revert' : actionType === 'revoke' ? 'Revoke' : 'Reactivate'}
         cancelText="Cancel"
-        variant={actionType === 'reject' || actionType === 'suspend' ? 'danger' : 'primary'}
+        variant={actionType === 'reject' || actionType === 'suspend' || actionType === 'revoke' ? 'danger' : 'primary'}
       />
     </div>
   );

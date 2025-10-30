@@ -170,7 +170,7 @@ const WithdrawFunds = () => {
                 <option value="">Choose an account...</option>
                 {(accounts || []).map((account) => (
                   <option key={account.id} value={account.id}>
-                    {account.accountNumber} - {account.customerId?.fullName || 'Unknown Customer'} 
+                    {account.accountNumber} - {account.customer?.fullName || account.customerId?.fullName || 'Unknown Customer'} 
                     ({account.balance?.toLocaleString() || 0} RWF)
                   </option>
                 ))}

@@ -9,27 +9,83 @@ import Button from "../components/Button";
 import Loader from "../components/Loader";
 
 const AddSavingsAccount = () => {
-  const { createSavingsAccount, fetchCustomers, customers, customersLoading } = useAppContext();
+  const { createSavingsAccount, fetchCustomers, customers, customersLoading, api } = useAppContext();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [showConfirmationError, setShowConfirmationError] = useState(false);
+  const [accountProducts, setAccountProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(true);
 
   const [accountData, setAccountData] = useState({
     customerId: "",
-    accountType: "regular",
+    productId: "",
+    accountType: "",
     minimumBalance: 0,
-    interestRate: 2.5,
+    interestRate: 0,
   });
 
-  // Fetch customers once on mount
+  // Fetch customers and products once on mount
   useEffect(() => {
     fetchCustomers(true);
+    fetchAccountProducts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Debug: Log customer data to check structure
+  useEffect(() => {
+    if (customers.length > 0) {
+      console.log('AddSavingsAccount - Sample customer:', customers[0]);
+      console.log('AddSavingsAccount - Customer structure:', {
+        personalInfo: customers[0].personalInfo,
+        customerCode: customers[0].customerCode
+      });
+    }
+  }, [customers]);
+
+  const fetchAccountProducts = async () => {
+    try {
+      setProductsLoading(true);
+      const { data } = await api.get('/account-products/active');
+      if (data.success) {
+        setAccountProducts(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching account products:', error);
+      toast.error('Failed to load account products');
+    } finally {
+      setProductsLoading(false);
+    }
+  };
+
+  const handleProductChange = (e) => {
+    const productId = e.target.value;
+    const selectedProduct = accountProducts.find(p => p._id === productId);
+    
+    if (selectedProduct) {
+      setAccountData({
+        ...accountData,
+        productId,
+        accountType: selectedProduct.accountType,
+        minimumBalance: selectedProduct.minimumBalance || 0,
+        interestRate: selectedProduct.interestRate || 0,
+      });
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!accountData.customerId) {
+      toast.error("Please select a customer.");
+      return;
+    }
+    
+    if (!accountData.productId) {
+      toast.error("Please select an account product.");
+      return;
+    }
     
     if (!isConfirmed) {
       setShowConfirmationError(true);
@@ -56,17 +112,11 @@ const AddSavingsAccount = () => {
     }
   };
 
-  const accountTypeOptions = [
-    { value: "regular", label: "Regular Savings" },
-    { value: "premium", label: "Premium Savings" },
-    { value: "fixed", label: "Fixed Deposit" }
-  ];
-
   // Filter customers who don't already have a savings account
   const availableCustomers = Array.isArray(customers) ? customers.filter(customer => !customer.savingsAccount) : [];
 
-  // Show loading state while customers are being fetched
-  if (customersLoading) {
+  // Show loading state while customers or products are being fetched
+  if (customersLoading || productsLoading) {
     return <Loader />;
   }
 
@@ -92,10 +142,18 @@ const AddSavingsAccount = () => {
               label="Select Customer"
               value={accountData.customerId}
               onChange={(e) => setAccountData({ ...accountData, customerId: e.target.value })}
-              options={availableCustomers.map((customer) => ({ 
-                value: customer._id, 
-                label: `${customer.personalInfo?.fullName || 'Unknown Customer'} (${customer.customerCode || 'N/A'})` 
-              }))}
+              options={availableCustomers.map((customer) => {
+                // Try multiple possible field names for customer name
+                const customerName = 
+                  customer.personalInfo?.fullName || 
+                  customer.fullName || 
+                  customer.name || 
+                  'Unknown Customer';
+                return { 
+                  value: customer._id, 
+                  label: `${customerName} (${customer.customerCode || 'N/A'})` 
+                };
+              })}
               required
             />
             {availableCustomers.length === 0 && Array.isArray(customers) && customers.length > 0 && (
@@ -127,37 +185,67 @@ const AddSavingsAccount = () => {
 
         <section className="form-section">
           <div className="form-section-header">
-            <h2 className="form-section-title">Account Configuration</h2>
-            <p className="form-section-subtitle">Set up the savings account parameters</p>
+            <h2 className="form-section-title">Account Product Selection</h2>
+            <p className="form-section-subtitle">Choose the product for this savings account</p>
           </div>
           <div className="form-section-divider"></div>
           <div className="form-grid">
-            <SelectField
-              label="Account Type"
-              value={accountData.accountType}
-              onChange={(e) => setAccountData({ ...accountData, accountType: e.target.value })}
-              options={accountTypeOptions}
-              required
-            />
-            <InputField
-              label="Minimum Balance (RWF)"
-              type="number"
-              value={accountData.minimumBalance}
-              onChange={(e) => setAccountData({ ...accountData, minimumBalance: parseFloat(e.target.value) || 0 })}
-              min="0"
-              step="100"
-              required
-            />
-            <InputField
-              label="Interest Rate (%)"
-              type="number"
-              value={accountData.interestRate}
-              onChange={(e) => setAccountData({ ...accountData, interestRate: parseFloat(e.target.value) || 0 })}
-              min="0"
-              max="100"
-              step="0.1"
-              required
-            />
+            {productsLoading ? (
+              <div className="col-span-full flex items-center justify-center py-8">
+                <Loader />
+              </div>
+            ) : (
+              <>
+                <SelectField
+                  label="Select Account Product"
+                  value={accountData.productId}
+                  onChange={handleProductChange}
+                  options={[
+                    { value: "", label: "Select a product..." },
+                    ...accountProducts.map((product) => ({
+                      value: product._id,
+                      label: `${product.productName} (${product.productCode})`
+                    }))
+                  ]}
+                  required
+                />
+                {accountData.productId && (
+                  <>
+                    <div className="col-span-full bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                      <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-2">
+                        Product Details
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="text-blue-700 dark:text-blue-400">Product:</span>
+                          <span className="ml-2 text-blue-900 dark:text-blue-200 font-medium">
+                            {accountProducts.find(p => p._id === accountData.productId)?.productName}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-blue-700 dark:text-blue-400">Type:</span>
+                          <span className="ml-2 text-blue-900 dark:text-blue-200 font-medium capitalize">
+                            {accountData.accountType}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-blue-700 dark:text-blue-400">Minimum Balance:</span>
+                          <span className="ml-2 text-blue-900 dark:text-blue-200 font-medium">
+                            {accountData.minimumBalance.toLocaleString()} RWF
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-blue-700 dark:text-blue-400">Interest Rate:</span>
+                          <span className="ml-2 text-blue-900 dark:text-blue-200 font-medium">
+                            {accountData.interestRate}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </div>
         </section>
 
@@ -170,9 +258,17 @@ const AddSavingsAccount = () => {
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Account Type</label>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Selected Product</label>
                 <p className="text-gray-900 dark:text-white font-medium">
-                  {accountTypeOptions.find(opt => opt.value === accountData.accountType)?.label || accountData.accountType}
+                  {accountData.productId 
+                    ? accountProducts.find(p => p._id === accountData.productId)?.productName 
+                    : 'Not selected'}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Account Type</label>
+                <p className="text-gray-900 dark:text-white font-medium capitalize">
+                  {accountData.accountType || 'Not selected'}
                 </p>
               </div>
               <div>
@@ -249,7 +345,13 @@ const AddSavingsAccount = () => {
             type="submit" 
             variant="primary" 
             loading={loading}
-            disabled={availableCustomers.length === 0 || !Array.isArray(customers) || customers.length === 0}
+            disabled={
+              availableCustomers.length === 0 || 
+              !Array.isArray(customers) || 
+              customers.length === 0 || 
+              !accountData.productId ||
+              accountProducts.length === 0
+            }
           >
             Create Savings Account
           </Button>

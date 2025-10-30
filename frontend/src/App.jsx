@@ -39,6 +39,10 @@ const DepositFunds = lazy(() => import('./pages/DepositFunds'));
 const WithdrawFunds = lazy(() => import('./pages/WithdrawFunds'));
 const DeviceVerifications = lazy(() => import('./pages/DeviceVerifications'));
 const DeviceVerificationDetails = lazy(() => import('./pages/DeviceVerificationDetails'));
+const AccountProducts = lazy(() => import('./pages/AccountProducts'));
+const AddAccountProduct = lazy(() => import('./pages/AddAccountProduct'));
+const AccountProductDetails = lazy(() => import('./pages/AccountProductDetails'));
+const EditAccountProduct = lazy(() => import('./pages/EditAccountProduct'));
 
 // Core admin features only - aligned with practical test requirements
 
@@ -108,6 +112,12 @@ const App = () => {
           {/* Device Verification Routes */}
           <Route path="device-verifications" element={<DeviceVerifications />} />
           <Route path="device-verifications/:id" element={<DeviceVerificationDetails />} />
+          
+          {/* Account Products Routes */}
+          <Route path="account-products" element={<AccountProducts />} />
+          <Route path="account-products/add" element={<AddAccountProduct />} />
+          <Route path="account-products/:id" element={<AccountProductDetails />} />
+          <Route path="account-products/:id/edit" element={<EditAccountProduct />} />
           
           {/* Core admin features only - aligned with practical test requirements */}
         </Route>

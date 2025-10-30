@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 
 const customerSchema = new mongoose.Schema({
   customerCode: {
@@ -144,9 +144,11 @@ const customerSchema = new mongoose.Schema({
 customerSchema.pre('save', async function (next) {
   this.updatedAt = new Date();
   
-  // Hash password if modified and exists
+  // Hash password using SHA-512 as required by specifications
   if (this.isModified('password') && this.password) {
-    this.password = await bcrypt.hash(this.password, 12);
+    const hash = crypto.createHash('sha512');
+    hash.update(this.password);
+    this.password = hash.digest('hex');
   }
   
   next();
@@ -154,7 +156,10 @@ customerSchema.pre('save', async function (next) {
 
 // Method to compare passwords using SHA-512 (as required by assessment)
 customerSchema.methods.comparePassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+  const hash = crypto.createHash('sha512');
+  hash.update(enteredPassword);
+  const enteredHash = hash.digest('hex');
+  return enteredHash === this.password;
 };
 
 // Method to check if customer can login (device verification required)

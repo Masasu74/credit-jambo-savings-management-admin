@@ -475,13 +475,36 @@ export const getRecentTransactions = async (req, res) => {
     
     const transactions = await Transaction.find()
       .populate('accountId', 'accountNumber accountType')
-      .populate('customerId', 'customerCode personalInfo.fullName')
+      .populate('customerId', 'customerCode personalInfo.fullName contact.email contact.phone')
       .sort({ createdAt: -1 })
       .limit(limit);
 
+    // Map transactions to include necessary fields
+    const mappedTransactions = transactions.map(transaction => ({
+      _id: transaction._id,
+      transactionId: transaction.transactionId,
+      type: transaction.type,
+      amount: transaction.amount,
+      balanceAfter: transaction.balanceAfter,
+      description: transaction.description,
+      status: transaction.status,
+      createdAt: transaction.createdAt,
+      customer: transaction.customerId ? {
+        fullName: transaction.customerId.personalInfo?.fullName,
+        email: transaction.customerId.contact?.email,
+        phone: transaction.customerId.contact?.phone,
+        customerCode: transaction.customerId.customerCode
+      } : null,
+      customerId: transaction.customerId,
+      account: transaction.accountId ? {
+        accountNumber: transaction.accountId.accountNumber,
+        accountType: transaction.accountId.accountType
+      } : null
+    }));
+
     res.json({
       success: true,
-      data: transactions
+      data: mappedTransactions
     });
   } catch (error) {
     console.error('Error fetching recent transactions:', error);

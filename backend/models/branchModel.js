@@ -132,3 +132,9 @@ branchSchema.statics.findByAlias = function(alias) {
 const Branch = mongoose.model('Branch', branchSchema);
 
 export default Branch;
+
+
+
+
+
+

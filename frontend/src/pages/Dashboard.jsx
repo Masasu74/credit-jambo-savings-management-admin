@@ -1,5 +1,5 @@
 // pages/Dashboard.jsx - Credit Jambo Savings Management System
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../context/AppContext";
 import { useSystemColors } from "../hooks/useSystemColors";
@@ -12,11 +12,14 @@ import {
   FaWallet,
   FaArrowUp,
   FaArrowDown,
+  FaSync,
+  FaBox,
+  FaStar,
 } from "react-icons/fa";
 import DashCard from "../components/DashCard";
 import Table from "../components/Table";
 import Loader from "../components/Loader";
-import { DashboardCardSkeleton } from "../components/Skeleton";
+import Skeleton, { DashboardCardSkeleton, TableSkeleton } from "../components/Skeleton";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const Dashboard = () => {
@@ -54,37 +57,97 @@ const Dashboard = () => {
     pendingVerifications: 0
   });
   const [recentTransactions, setRecentTransactions] = useState([]);
+  const [accountProductsStats, setAccountProductsStats] = useState([]);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
+  const loadDashboardData = useCallback(async () => {
+    console.log('🔄 Loading dashboard data...');
+    setDashboardLoading(true);
+    try {
+      // Fetch savings accounts statistics
+      const { data: accountsData } = await api.get('/savings-accounts/stats/overview');
+      console.log('📊 Savings stats response:', accountsData);
+      if (accountsData.success) {
+        setSavingsStats(accountsData.data);
+      }
+    } catch (error) {
+      console.error('Error fetching savings stats:', error);
+    }
+
+    try {
+      // Fetch recent transactions
+      const { data: transactionsData } = await api.get('/transactions/recent');
+      console.log('💳 Transactions response:', transactionsData);
+      if (transactionsData.success) {
+        setRecentTransactions(transactionsData.data);
+      }
+    } catch (error) {
+      console.error('Error fetching recent transactions:', error);
+    }
+
+    try {
+      // Fetch account products with stats
+      const { data: productsData } = await api.get('/account-products');
+      console.log('📦 Account products response:', productsData);
+      if (productsData.success) {
+        // Get stats for each product
+        const productsWithStats = await Promise.all(
+          productsData.data.map(async (product) => {
+            try {
+              const { data: statsData } = await api.get(`/account-products/${product._id}/stats`);
+              return {
+                ...product,
+                totalAccounts: statsData.success ? statsData.data.totalAccounts : 0
+              };
+            } catch (error) {
+              return { ...product, totalAccounts: 0 };
+            }
+          })
+        );
+        setAccountProductsStats(productsWithStats);
+      }
+    } catch (error) {
+      console.error('Error fetching account products:', error);
+    } finally {
+      setDashboardLoading(false);
+      setDataLoaded(true);
+      console.log('✅ Dashboard data loading completed');
+    }
+  }, [api]);
+
+  // Load dashboard data when user is available and context is not loading
   useEffect(() => {
-    // Only load data if user is authenticated
-    if (!user) return;
+    console.log('🔄 Dashboard useEffect triggered:', { user: !!user, contextLoading, dashboardLoading });
+    // Only load data if user is authenticated and not loading
+    if (!user || contextLoading) return;
 
-    const loadData = async () => {
-      try {
-        // Fetch savings accounts statistics
-        const { data: accountsData } = await api.get('/savings-accounts/stats/overview');
-        if (accountsData.success) {
-          setSavingsStats(accountsData.data);
-        }
-      } catch (error) {
-        console.error('Error fetching savings stats:', error);
-      }
+    // Add a small delay to ensure the component is fully mounted
+    const timer = setTimeout(() => {
+      loadDashboardData();
+    }, 100);
 
-      try {
-        // Fetch recent transactions
-        const { data: transactionsData } = await api.get('/transactions/recent');
-        if (transactionsData.success) {
-          setRecentTransactions(transactionsData.data);
-        }
-      } catch (error) {
-        console.error('Error fetching recent transactions:', error);
-      }
+    return () => clearTimeout(timer);
+  }, [loadDashboardData, user, contextLoading]);
 
-    };
-    loadData();
-  }, [api, user]);
+  // Reset data loaded state when user changes
+  useEffect(() => {
+    if (user) {
+      setDataLoaded(false);
+      setDashboardLoading(true);
+    }
+  }, [user]);
 
+  // Additional effect to ensure data loads when component mounts with user already available
+  useEffect(() => {
+    console.log('🔄 Dashboard mount effect triggered:', { user: !!user, contextLoading, dataLoaded });
+    if (user && !contextLoading && !dataLoaded) {
+      // Only load if we haven't loaded yet
+      loadDashboardData();
+    }
+  }, [user, contextLoading, loadDashboardData, dataLoaded]);
 
+  // Show loading state only for initial context loading
   if (contextLoading) return <Loader />;
 
   // Redirect to login if not authenticated
@@ -102,6 +165,11 @@ const Dashboard = () => {
   const totalSavingsBalance = savingsStats.totalBalance || 0;
   const totalDeposits = savingsStats.totalDeposits || 0;
   const totalWithdrawals = savingsStats.totalWithdrawals || 0;
+
+  // Debug: Log savings stats (check browser console for these values)
+  console.log('🔍 Savings Stats:', savingsStats);
+  console.log('🔍 Total Deposits from Stats:', totalDeposits);
+  console.log('🔍 Total Withdrawals from Stats:', totalWithdrawals);
 
   // Utility function to format currency amounts
   const formatCurrency = (amount) => {
@@ -125,10 +193,14 @@ const Dashboard = () => {
     { name: 'Withdrawals', value: totalWithdrawals, color: '#EF4444' }
   ].filter(item => item.value > 0);
 
+  // Debug logging
+  console.log('Transaction Type Data:', transactionTypeData);
+  console.log('Total Deposits:', totalDeposits, 'Total Withdrawals:', totalWithdrawals);
+
   const recentTransactionsData = recentTransactions.slice(0, 5).map(transaction => ({
     id: transaction._id,
-    customer: transaction.customer?.fullName || transaction.customer?.personalInfo?.fullName || "Unknown",
-    type: transaction.transactionType,
+    customer: transaction.customer?.fullName || transaction.customerId?.personalInfo?.fullName || "Unknown",
+    type: transaction.type || transaction.transactionType,
     amount: formatCurrency(transaction.amount),
     date: new Date(transaction.createdAt).toLocaleDateString(),
     status: transaction.status
@@ -162,12 +234,20 @@ const Dashboard = () => {
               Monitor and manage customer savings accounts
             </p>
           </div>
+          <button
+            onClick={loadDashboardData}
+            disabled={dashboardLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors duration-200 font-medium"
+          >
+            <FaSync className={`${dashboardLoading ? 'animate-spin' : ''}`} />
+            {dashboardLoading ? 'Loading...' : 'Refresh Data'}
+          </button>
         </div>
         
         {/* Dashboard Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4 w-full">
-          {customersLoading ? (
-            // Show skeleton cards while loading
+          {dashboardLoading ? (
+            // Show skeleton cards while loading dashboard data
             Array.from({ length: 8 }).map((_, index) => (
               <DashboardCardSkeleton key={index} />
             ))
@@ -236,6 +316,28 @@ const Dashboard = () => {
                 icon={<FaChartLine size={18} style={{ color: currentColors.primary }} />}
                 description="Net savings activity (deposits minus withdrawals)"
               />
+              <DashCard
+                title="Total Products"
+                number={accountProductsStats.length.toString()}
+                subtitle={`${accountProductsStats.filter(p => p.isActive).length} active`}
+                icon={<FaBox size={18} style={{ color: currentColors.primary }} />}
+                description="Total number of account products available"
+              />
+              <DashCard
+                title="Most Popular Product"
+                number={accountProductsStats.length > 0 
+                  ? accountProductsStats.reduce((max, product) => 
+                      (product.totalAccounts || 0) > (max.totalAccounts || 0) ? product : max
+                    ).productName.substring(0, 15)
+                  : 'N/A'}
+                subtitle={accountProductsStats.length > 0 
+                  ? `${accountProductsStats.reduce((max, product) => 
+                      (product.totalAccounts || 0) > (max.totalAccounts || 0) ? product : max
+                    ).totalAccounts} accounts`
+                  : ''}
+                icon={<FaStar size={18} style={{ color: currentColors.accent }} />}
+                description="Product with the most accounts"
+              />
             </>
           )}
         </div>
@@ -250,7 +352,27 @@ const Dashboard = () => {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
+        {dashboardLoading ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
+            {/* Chart skeletons */}
+            {Array.from({ length: 2 }).map((_, index) => (
+              <div key={index} className="bg-white dark:bg-gray-800 p-4 sm:p-6 md:p-8 rounded-xl shadow-md border border-gray-100 dark:border-gray-700">
+                <div className="space-y-4">
+                  <Skeleton className="h-6 w-48" />
+                  <Skeleton className="h-4 w-64" />
+                  <div className="flex justify-center items-center h-64">
+                    <Skeleton className="h-48 w-48 rounded-full" />
+                  </div>
+                  <div className="flex justify-center gap-4">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
           {/* Account Status Distribution */}
           <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 md:p-8 rounded-xl shadow-md border border-gray-100 dark:border-gray-700">
             <h3 className="text-lg md:text-xl font-semibold mb-2 text-gray-900 dark:text-white">Account Status Distribution</h3>
@@ -303,17 +425,51 @@ const Dashboard = () => {
           <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 md:p-8 rounded-xl shadow-md border border-gray-100 dark:border-gray-700">
             <h3 className="text-lg md:text-xl font-semibold mb-2 text-gray-900 dark:text-white">Transaction Types</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Deposits vs Withdrawals comparison</p>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={transactionTypeData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip formatter={(value) => formatCurrency(value)} />
-                <Legend />
-                <Bar dataKey="value" fill="#10B981" name="Amount" />
-              </BarChart>
-            </ResponsiveContainer>
+            {transactionTypeData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={transactionTypeData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => formatCurrency(value)} />
+                  <Legend />
+                  <Bar dataKey="value" fill="#10B981" name="Amount" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-64 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                <div className="text-center">
+                  <p className="text-gray-600 font-medium mb-2">No Transaction Data Available</p>
+                  <p className="text-gray-500 text-sm">Transaction statistics will appear here once transactions are recorded</p>
+                </div>
+              </div>
+            )}
           </div>
+        </div>
+        )}
+
+        {/* Account Products Distribution Chart */}
+        <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 md:p-8 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 mt-6">
+          <h3 className="text-lg md:text-xl font-semibold mb-2 text-gray-900 dark:text-white">Account Products Usage</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Distribution of customers across different products</p>
+          {accountProductsStats.length > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={accountProductsStats.map(p => ({ name: p.productName, accounts: p.totalAccounts || 0 }))}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="accounts" fill="#8B5CF6" name="Accounts" />
+                </BarChart>
+              </ResponsiveContainer>
+            </>
+          ) : (
+            <div className="flex items-center justify-center h-64">
+              <p className="text-gray-500">No account products data available</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -326,7 +482,29 @@ const Dashboard = () => {
           </div>
         </div>
         
-        <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 md:p-8 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 hover:shadow-xl dark:hover:shadow-gray-900/20 transition-all duration-300">
+        {dashboardLoading ? (
+          <div className="space-y-6">
+            {/* Recent Transactions skeleton */}
+            <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 md:p-8 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700">
+              <div className="flex items-center gap-3 mb-6">
+                <Skeleton className="w-2 h-8" />
+                <Skeleton className="h-6 w-48" />
+              </div>
+              <TableSkeleton rows={5} columns={5} />
+            </div>
+            
+            {/* Recent Customers skeleton */}
+            <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 md:p-8 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700">
+              <div className="flex items-center gap-3 mb-6">
+                <Skeleton className="w-2 h-8" />
+                <Skeleton className="h-6 w-56" />
+              </div>
+              <TableSkeleton rows={5} columns={5} />
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 md:p-8 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 hover:shadow-xl dark:hover:shadow-gray-900/20 transition-all duration-300">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-2 h-8 bg-gradient-to-b from-blue-500 to-blue-600 rounded-full"></div>
             <h3 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white">Recent Transactions</h3>
@@ -458,6 +636,8 @@ const Dashboard = () => {
             }}
           />
         </div>
+          </>
+        )}
       </div>
     </div>
   );

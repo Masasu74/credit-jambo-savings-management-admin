@@ -274,12 +274,14 @@ const SavingsAccounts = () => {
                       <Link
                         to={`/savings-accounts/${account.id}`}
                         className="text-gray-400 hover:text-gray-600"
+                        onClick={() => console.log('👁️ View savings account clicked:', account.id)}
                       >
                         <FaEye className="h-5 w-5" />
                       </Link>
                       <Link
                         to={`/savings-accounts/edit/${account.id}`}
                         className="text-gray-400 hover:text-gray-600"
+                        onClick={() => console.log('✏️ Edit savings account clicked:', account.id)}
                       >
                         <FaEdit className="h-5 w-5" />
                       </Link>

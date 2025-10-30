@@ -10,7 +10,8 @@ import {
   recordDeviceLogin,
   getDeviceVerificationStats,
   suspendDevice,
-  reactivateDevice
+  reactivateDevice,
+  revokeCustomerDeviceVerification
 } from '../controllers/deviceVerificationController.js';
 import auth from '../middleware/auth.js';
 import { authorize } from '../middleware/rbac.js';
@@ -52,5 +53,8 @@ router.patch('/:id/suspend', authorize(['admin']), suspendDevice);
 
 // Reactivate device (admin only)
 router.patch('/:id/reactivate', authorize(['admin']), reactivateDevice);
+
+// Revoke device verification by customer ID (admin only)
+router.patch('/revoke-customer/:customerId', authorize(['admin']), revokeCustomerDeviceVerification);
 
 export default router;

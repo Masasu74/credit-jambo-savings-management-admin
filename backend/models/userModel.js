@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 
 const userSchema = new mongoose.Schema({
   fullName: { type: String, required: true, trim: true },
@@ -26,12 +26,18 @@ const userSchema = new mongoose.Schema({
 
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 12);
+  // Use SHA-512 as required by the specifications
+  const hash = crypto.createHash('sha512');
+  hash.update(this.password);
+  this.password = hash.digest('hex');
   next();
 });
 
 userSchema.methods.comparePassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+  const hash = crypto.createHash('sha512');
+  hash.update(enteredPassword);
+  const enteredHash = hash.digest('hex');
+  return enteredHash === this.password;
 };
 
 // Add database indexes for better performance

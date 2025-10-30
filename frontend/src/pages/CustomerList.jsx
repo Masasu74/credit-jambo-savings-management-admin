@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../context/AppContext";
 import DataView from "../components/DataView";
-import { FaEye, FaEdit, FaTrash } from "react-icons/fa";
+import { FaEye, FaEdit, FaTrash, FaTimesCircle } from "react-icons/fa";
 import ConfirmationPopup from "../components/ConfirmationPopup";
 import Loader from "../components/Loader";
 import { useSystemColors } from "../hooks/useSystemColors";
@@ -10,6 +10,7 @@ import { useSystemColors } from "../hooks/useSystemColors";
 const CustomerList = () => {
   const navigate = useNavigate();
   const { colors } = useSystemColors();
+  
   const [showPopup, setShowPopup] = useState(false);
   const [popupMessage, setPopupMessage] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -65,11 +66,38 @@ const CustomerList = () => {
   const handleConfirm = async () => {
     if (selectedCustomer) {
       try {
-        await deleteCustomer(selectedCustomer);
-        // Force refresh after deletion to ensure we get the latest data
-        await fetchCustomers(true);
+        // Check if this is a revoke device verification action
+        if (popupMessage.includes('revoke this customer\'s device verification')) {
+          // Find the customer to get their device verification ID
+          const customer = customers.find(c => c._id === selectedCustomer);
+          if (customer && customer.deviceVerified) {
+            // Call the revoke API
+            const response = await fetch(`/api/device-verifications/revoke-customer/${selectedCustomer}`, {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ action: 'revoke' })
+            });
+            
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.message || 'Failed to revoke device verification');
+            }
+            
+            console.log('✅ Device verification revoked successfully');
+            // Force refresh after revocation to ensure we get the latest data
+            await fetchCustomers(true);
+          }
+        } else {
+          // Regular delete action
+          await deleteCustomer(selectedCustomer);
+          // Force refresh after deletion to ensure we get the latest data
+          await fetchCustomers(true);
+        }
       } catch (error) {
-        console.error("Customer deletion failed:", error);
+        console.error("Action failed:", error);
         // Error is already handled by handlePermissionError in AppContext
       }
     }
@@ -192,6 +220,7 @@ const CustomerList = () => {
 
   return (
     <>
+
       <DataView
         title="Customers"
         description="View and manage registered customers"
@@ -199,29 +228,62 @@ const CustomerList = () => {
         data={customers}
         loading={customersLoading}
         filters={filters}
-        onAddNew={() => navigate("/addcustomer")}
+        onAddNew={() => navigate("/customers/add")}
         renderActions={(item) => (
           <div className="flex gap-3 items-center">
             <FaEye
               size={18}
               className="text-blue-600 cursor-pointer hover:text-blue-800"
               title="View"
-              onClick={() => navigate(`/customers/${item._id}`)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const customerId = item._id || item.id;
+                if (!customerId) {
+                  console.warn('No customer id on item, cannot navigate.', item);
+                  return;
+                }
+                console.log('👁️ View button clicked for customer:', customerId);
+                console.log('👁️ Navigating to:', `/customers/${customerId}`);
+                navigate(`/customers/${customerId}`);
+              }}
             />
             <FaEdit
               size={18}
               className="text-gray-600 cursor-pointer hover:text-gray-800"
               title="Edit"
-              onClick={() => navigate(`/customers/edit/${item._id}`)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('✏️ Edit button clicked for customer:', item._id);
+                console.log('✏️ Navigating to:', `/customers/edit/${item._id}`);
+                navigate(`/customers/edit/${item._id}`);
+              }}
             />
+            {item.deviceVerified && (
+              <FaTimesCircle
+                size={18}
+                className="text-orange-600 cursor-pointer hover:text-orange-800"
+                title="Revoke Device Verification"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('🔄 Revoke device verification clicked for customer:', item._id);
+                  handleOpenPopup("Are you sure you want to revoke this customer's device verification? This will require them to re-verify their device.", item._id);
+                }}
+              />
+            )}
             {user?.role === "admin" && (
               <FaTrash
                 size={18}
                 className="text-red-600 cursor-pointer hover:text-red-800"
                 title="Delete"
-                onClick={() =>
-                  handleOpenPopup("Are you sure you want to delete this customer?", item._id)
-                }
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('🗑️ Delete button clicked for customer:', item._id);
+                  handleOpenPopup("Are you sure you want to delete this customer?", item._id);
+                }}
               />
             )}
           </div>

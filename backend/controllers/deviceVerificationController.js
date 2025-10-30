@@ -99,10 +99,19 @@ export const verifyDevice = async (req, res) => {
       });
     }
 
-    if (deviceVerification.status !== 'pending') {
+    // Allow revert action on rejected/suspended devices, otherwise must be pending
+    if (deviceVerification.status !== 'pending' && action !== 'revert') {
       return res.status(400).json({
         success: false,
         message: 'Device is not pending verification'
+      });
+    }
+    
+    // For revert action, device must be rejected or suspended
+    if (action === 'revert' && !['rejected', 'suspended'].includes(deviceVerification.status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Device must be rejected or suspended to revert'
       });
     }
 
@@ -123,10 +132,37 @@ export const verifyDevice = async (req, res) => {
         deviceVerification.suspendDevice(reason, adminId);
         break;
       
+      case 'revert':
+        // Revert rejected/suspended device back to pending
+        deviceVerification.status = 'pending';
+        deviceVerification.isActive = true;
+        deviceVerification.rejectionReason = null;
+        deviceVerification.verifiedBy = null;
+        deviceVerification.verifiedAt = null;
+        break;
+      
+      case 'revoke':
+        // Revoke verified device back to pending
+        if (deviceVerification.status !== 'verified') {
+          return res.status(400).json({
+            success: false,
+            message: 'Only verified devices can be revoked'
+          });
+        }
+        deviceVerification.status = 'pending';
+        deviceVerification.isActive = true;
+        deviceVerification.verifiedBy = null;
+        deviceVerification.verifiedAt = null;
+        // Update customer device verification status
+        await Customer.findByIdAndUpdate(deviceVerification.customerId._id, { 
+          deviceVerified: false 
+        });
+        break;
+      
       default:
         return res.status(400).json({
           success: false,
-          message: 'Invalid action. Use: verify, reject, or suspend'
+          message: 'Invalid action. Use: verify, reject, suspend, revert, or revoke'
         });
     }
 
@@ -416,6 +452,57 @@ export const reactivateDevice = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to reactivate device',
+      error: error.message
+    });
+  }
+};
+
+// Revoke device verification by customer ID
+export const revokeCustomerDeviceVerification = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const adminId = req.user.id;
+
+    // Find all verified device verifications for this customer
+    const deviceVerifications = await DeviceVerification.find({ 
+      customerId, 
+      status: 'verified' 
+    });
+
+    if (deviceVerifications.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No verified devices found for this customer'
+      });
+    }
+
+    // Revoke all verified devices for this customer
+    for (const deviceVerification of deviceVerifications) {
+      deviceVerification.status = 'pending';
+      deviceVerification.isActive = true;
+      deviceVerification.verifiedBy = null;
+      deviceVerification.verifiedAt = null;
+      await deviceVerification.save();
+    }
+
+    // Update customer device verification status
+    await Customer.findByIdAndUpdate(customerId, { 
+      deviceVerified: false 
+    });
+
+    res.json({
+      success: true,
+      message: `Successfully revoked ${deviceVerifications.length} device verification(s) for customer`,
+      data: {
+        revokedCount: deviceVerifications.length,
+        customerId
+      }
+    });
+  } catch (error) {
+    console.error('Revoke customer device verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
       error: error.message
     });
   }

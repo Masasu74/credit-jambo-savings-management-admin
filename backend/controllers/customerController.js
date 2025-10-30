@@ -98,8 +98,17 @@ const addCustomer = async (req, res) => {
     if (!req.user) return res.status(401).json({ success: false, message: "Not authorized" });
 
     const { personalInfo, contact, maritalStatus, employment, branchId } = req.body;
-    const branch = await Branch.findById(branchId);
-    if (!branch) return res.status(404).json({ success: false, message: "Branch not found" });
+    
+    // Get default branch if no branchId provided
+    let branch;
+    if (branchId) {
+      branch = await Branch.findById(branchId);
+      if (!branch) return res.status(404).json({ success: false, message: "Branch not found" });
+    } else {
+      // Use default branch (first active branch)
+      branch = await Branch.findOne({ isActive: true });
+      if (!branch) return res.status(404).json({ success: false, message: "No active branch found" });
+    }
 
 const customerCode = await generateCustomId("customer", branch.code, "CUST");
 

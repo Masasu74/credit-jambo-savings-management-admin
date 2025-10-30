@@ -8,6 +8,7 @@ import deviceVerificationRouter from './routes/deviceVerificationRoute.js';
 import savingsCustomerRouter from './routes/savingsCustomerRoute.js';
 import userRouter from './routes/userRoute.js';
 import customerAuthRouter from './routes/customerAuthRoute.js';
+import accountProductRouter from './routes/accountProductRoute.js';
 import 'dotenv/config.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -531,6 +532,7 @@ app.use('/api/customer-auth', customerAuthRouter);
 app.use('/api/user', userRouter);
 app.use('/api/notifications', notificationRouter);
 app.use('/api/system-settings', systemSettingsRouter);
+app.use('/api/account-products', accountProductRouter);
 app.use('/api', healthRouter);
 
 // Error handling middleware for multer

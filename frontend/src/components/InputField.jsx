@@ -10,7 +10,9 @@ const InputField = ({
   className = "",
   id,
   min,
-  max
+  max,
+  name,
+  helpText
 }) => {
   const { colors } = useSystemColors();
   const inputId = id || label.toLowerCase().replace(/\s+/g, "-");
@@ -34,6 +36,7 @@ const InputField = ({
       </label>
       <input
         id={inputId}
+        name={name}
         type={type}
         value={value || ''}
         onChange={onChange}
@@ -55,6 +58,9 @@ const InputField = ({
           e.target.style.boxShadow = 'none';
         }}
       />
+      {helpText && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{helpText}</p>
+      )}
     </div>
   );
 };

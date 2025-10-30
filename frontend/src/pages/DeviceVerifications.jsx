@@ -7,7 +7,8 @@ import {
   FaEye,
   FaMobile,
   FaDesktop,
-  FaArrowLeft
+  FaArrowLeft,
+  FaUser
 } from 'react-icons/fa';
 
 const DeviceVerifications = () => {
@@ -15,9 +16,16 @@ const DeviceVerifications = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all');
+  const [lastRefresh, setLastRefresh] = useState(new Date());
 
   useEffect(() => {
     fetchVerifications();
+    // Reduce frequency and make it user-friendly; fetch every 30s
+    const interval = setInterval(() => {
+      fetchVerifications();
+      setLastRefresh(new Date());
+    }, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchVerifications = async () => {
@@ -48,12 +56,16 @@ const DeviceVerifications = () => {
 
   const handleVerification = async (verificationId, action) => {
     try {
-      const response = await fetch(`/api/device-verifications/${verificationId}/${action}`, {
+      const response = await fetch(`/api/device-verifications/${verificationId}/verify`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ 
+          action: action,
+          reason: action === 'reject' ? 'Rejected by admin' : undefined
+        })
       });
       
       if (!response.ok) {
@@ -99,6 +111,13 @@ const DeviceVerifications = () => {
     ) : (
       <FaDesktop className="h-5 w-5 text-gray-400" />
     );
+  };
+
+  const formatDate = (value) => {
+    if (!value) return 'N/A';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return 'N/A';
+    return d.toLocaleDateString();
   };
 
   const filteredVerifications = (verifications || []).filter(verification => {
@@ -251,10 +270,23 @@ const DeviceVerifications = () => {
       {/* Verifications Table */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <div className="px-4 py-5 sm:px-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">Device Verification Requests</h3>
-          <p className="mt-1 max-w-2xl text-sm text-gray-500">
-            Review and approve customer device registrations
-          </p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-lg leading-6 font-medium text-gray-900">Device Verification Requests</h3>
+              <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                Review and approve customer device registrations
+              </p>
+            </div>
+            <div className="flex items-center gap-3 text-xs text-gray-400">
+              <span>Last refreshed: {lastRefresh.toLocaleTimeString()}</span>
+              <button
+                onClick={() => { fetchVerifications(); setLastRefresh(new Date()); }}
+                className="px-2 py-1 rounded border border-gray-300 hover:bg-gray-50"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
         </div>
         
         {filteredVerifications.length === 0 ? (
@@ -283,26 +315,25 @@ const DeviceVerifications = () => {
                         </p>
                         {getStatusBadge(verification.status)}
                       </div>
+                      <div className="mt-1">
+                        <div className="flex items-center gap-1">
+                          <FaUser className="w-3 h-3 text-blue-600" />
+                          <p className="text-sm font-medium text-blue-600">
+                            {verification.customer?.fullName || verification.customerId?.personalInfo?.fullName || 'Unknown Customer'}
+                          </p>
+                        </div>
+                      </div>
                       <div className="flex items-center mt-1">
-                        <p className="text-sm text-gray-500">
-                          Device ID: {verification.deviceId}
-                        </p>
+                        <p className="text-sm text-gray-500">Device ID: {verification.deviceId}</p>
                         <span className="mx-2">•</span>
-                        <p className="text-sm text-gray-500">
-                          IP: {verification.ipAddress}
-                        </p>
+                        <p className="text-sm text-gray-500">IP: {verification.ipAddress || 'N/A'}</p>
                         <span className="mx-2">•</span>
-                        <p className="text-sm text-gray-500">
-                          {new Date(verification.requestedAt).toLocaleDateString()}
-                        </p>
+                        <p className="text-sm text-gray-500">Requested: {formatDate(verification.requestedAt || verification.createdAt)}</p>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-4">
                     <div className="text-right">
-                      <p className="text-sm text-gray-500">
-                        Customer: {verification.customerId?.fullName || 'Unknown'}
-                      </p>
                       {verification.verifiedAt && (
                         <p className="text-xs text-gray-500">
                           Verified: {new Date(verification.verifiedAt).toLocaleDateString()}
@@ -319,7 +350,7 @@ const DeviceVerifications = () => {
                       {verification.status === 'pending' && (
                         <div className="flex space-x-1">
                           <button
-                            onClick={() => handleVerification(verification.id, 'approve')}
+                            onClick={() => handleVerification(verification.id, 'verify')}
                             className="text-green-600 hover:text-green-800"
                             title="Approve"
                           >
@@ -341,6 +372,15 @@ const DeviceVerifications = () => {
                           title="Revert to Pending"
                         >
                           <FaArrowLeft className="h-5 w-5" />
+                        </button>
+                      )}
+                      {verification.status === 'verified' && (
+                        <button
+                          onClick={() => handleVerification(verification.id, 'revoke')}
+                          className="text-orange-600 hover:text-orange-800"
+                          title="Revoke Verification"
+                        >
+                          <FaTimesCircle className="h-5 w-5" />
                         </button>
                       )}
                     </div>

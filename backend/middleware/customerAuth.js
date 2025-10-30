@@ -31,8 +31,7 @@ const customerAuthMiddleware = async (req, res, next) => {
 
       // Get customer from database
       const customer = await Customer.findById(decoded.customerId)
-        .select('-password')
-        .populate('branch', 'name code alias');
+        .select('-password');
 
       if (!customer) {
         return res.status(404).json({
@@ -54,7 +53,6 @@ const customerAuthMiddleware = async (req, res, next) => {
         customerCode: customer.customerCode,
         fullName: customer.personalInfo.fullName,
         email: customer.contact.email,
-        branch: customer.branch,
         tenant: customer.tenant
       };
 

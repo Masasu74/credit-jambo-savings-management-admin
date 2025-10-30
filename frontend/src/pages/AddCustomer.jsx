@@ -1,194 +1,153 @@
-// 📁 pages/AddCustomer.js
-import { useState, useEffect, useMemo } from "react";
+// 📁 pages/AddCustomer.jsx - Simplified to match mobile app registration
+import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../context/AppContext";
 import InputField from "../components/InputField";
 import SelectField from "../components/SelectField";
-import FileUpload from "../components/FileUpload";
-import AddressForm from "../components/AddressForm";
-import EmploymentDetails from "../components/EmploymentDetails";
-import MaritalStatusSection from "../components/MaritalStatusSection";
 import Button from "../components/Button";
-import Loader from "../components/Loader";
-import countries from '../assets/countries.js';
 
 const AddCustomer = () => {
-  const { createCustomer, fetchBranches, branches } = useAppContext();
+  const { api } = useAppContext();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [showCredentials, setShowCredentials] = useState(false);
   const [credentials, setCredentials] = useState(null);
-  const [isConfirmed, setIsConfirmed] = useState(false);
-  const [showConfirmationError, setShowConfirmationError] = useState(false);
 
-  const [branchId, setBranchId] = useState("");
-
-  const [personalInfo, setPersonalInfo] = useState({
+  // Form state matching mobile app registration (with optional profile fields)
+  const [formData, setFormData] = useState({
+    // Required basics
     fullName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    phone: "",
+    // Optional profile fields
     dob: "",
     gender: "",
-    placeOfBirth: "",
-    nationality: "",
-    idNumber: "",
-    idFile: null,
-    photo: null,
-  });
-
-  const [address, setAddress] = useState({
-    province: "",
-    district: "",
-    sector: "",
-    cell: "",
-    village: "",
-    phone: "",
-    email: "",
-  });
-
-  const [maritalStatus, setMaritalStatus] = useState({
-    status: "",
-    spouseIdFile: null,
-    marriageCertFile: null,
-    singleCertFile: null,
-  });
-
-  const [employment, setEmployment] = useState({
-    status: "",
+    employmentStatus: "",
     jobTitle: "",
-    employerName: "",
-    employerAddress: "",
-    employerContact: "",
     salary: "",
-    contractCertificate: null,
-    stampedPaySlips: null,
     businessName: "",
-    businessType: "",
-    businessCertificate: null,
-    monthlyRevenue: "",
+    monthlyRevenue: ""
   });
+  const [isConfirmed, setIsConfirmed] = useState(false);
 
-  // Fetch branches once on mount to avoid effect loops
-  useEffect(() => {
-    fetchBranches(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // No branches/tenant needed for this form
+  useEffect(() => {}, []);
 
-  // Compute the latest allowed DOB (must be at least 18 years old)
-  const maxDob = useMemo(() => {
-    const now = new Date();
-    const eighteenYearsAgo = new Date(
-      now.getFullYear() - 18,
-      now.getMonth(),
-      now.getDate()
-    );
-    return eighteenYearsAgo.toISOString().split("T")[0];
-  }, []);
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleDateChange = (e) => {
+    const { name, value } = e.target;
+    
+    // Validate age if DOB is provided BEFORE updating form state
+    if (value) {
+      const today = new Date();
+      const birthDate = new Date(value);
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      
+      if (age < 18) {
+        toast.error("Customer must be at least 18 years old.");
+        return; // Don't update the form state if age is invalid
+      }
+    }
+    
+    // Only update form state if validation passed
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Validation
+    if (!formData.fullName || !formData.email || !formData.password || !formData.phone) {
+      toast.error("Please fill in all required fields.");
+      return;
+    }
+
+    // Validate email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+
+    // Validate password
+    if (formData.password.length < 8) {
+      toast.error("Password must be at least 8 characters long.");
+      return;
+    }
+    if (formData.confirmPassword && formData.password !== formData.confirmPassword) {
+      toast.error("Passwords do not match.");
+      return;
+    }
+
+    // Validate phone (basic validation)
+    if (formData.phone.length < 10) {
+      toast.error("Please enter a valid phone number.");
+      return;
+    }
+
+    // Employment-specific validation (optional fields)
+    if (formData.employmentStatus === 'employed' && !formData.jobTitle) {
+      toast.error("Please provide job title for employed status.");
+      return;
+    }
+    if (formData.employmentStatus === 'self-employed' && !formData.businessName) {
+      toast.error("Please provide business name for self-employed status.");
+      return;
+    }
+
     if (!isConfirmed) {
-      setShowConfirmationError(true);
       toast.error("Please confirm that the information provided is correct.");
       return;
     }
-    setShowConfirmationError(false);
-    
+
     setLoading(true);
-    setUploadProgress(0);
 
     try {
-      // Age validation: ensure DOB makes the customer at least 18
-      if (personalInfo.dob) {
-        const dobDate = new Date(personalInfo.dob);
-        const maxAllowed = new Date(maxDob);
-        if (dobDate > maxAllowed) {
-          setLoading(false);
-          toast.error("Customer must be at least 18 years old.");
-          return;
-        }
-      }
-
-      const formData = new FormData();
-      formData.append("branchId", branchId);
-
-      Object.entries(personalInfo).forEach(([key, value]) => {
-        if (!["idFile", "photo"].includes(key)) formData.append(`personalInfo[${key}]`, value);
+      // Only send required fields that backend expects
+      const response = await api.post("/customer-auth/register", {
+        fullName: formData.fullName,
+        email: formData.email,
+        password: formData.password,
+        phone: formData.phone
       });
-      if (personalInfo.idFile) formData.append("idFile", personalInfo.idFile);
-      if (personalInfo.photo) formData.append("photo", personalInfo.photo);
 
-      formData.append("contact[phone]", address.phone);
-formData.append("contact[email]", address.email);
-
-["province", "district", "sector", "cell", "village"].forEach((key) => {
-  formData.append(`contact[address][${key}]`, address[key]);
-});
-
-
-      Object.entries(maritalStatus).forEach(([key, value]) => {
-        if (!["spouseIdFile", "marriageCertFile", "singleCertFile"].includes(key)) {
-          formData.append(`maritalStatus[${key}]`, value);
-        }
-      });
-      if (maritalStatus.spouseIdFile) formData.append("spouseIdFile", maritalStatus.spouseIdFile);
-      if (maritalStatus.marriageCertFile) formData.append("marriageCertFile", maritalStatus.marriageCertFile);
-      if (maritalStatus.singleCertFile) formData.append("singleCertFile", maritalStatus.singleCertFile);
-
-      Object.entries(employment).forEach(([key, value]) => {
-        if (!["contractCertificate", "stampedPaySlips", "businessCertificate"].includes(key)) {
-          formData.append(`employment[${key}]`, value);
-        }
-      });
-      if (employment.contractCertificate) formData.append("contractCertificate", employment.contractCertificate);
-      if (employment.businessCertificate) formData.append("businessCertificate", employment.businessCertificate);
-      if (employment.stampedPaySlips) {
-        const files = Array.isArray(employment.stampedPaySlips)
-          ? employment.stampedPaySlips
-          : [employment.stampedPaySlips];
-        files.forEach(file => formData.append("stampedPaySlips", file));
-      }
-
-      // Handle additional files
-      if (personalInfo.additionalFiles) {
-        const files = Array.isArray(personalInfo.additionalFiles)
-          ? personalInfo.additionalFiles
-          : [personalInfo.additionalFiles];
-        files.forEach(file => formData.append("additionalFiles", file));
-      }
-
-      // Simulate upload progress for better UX
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return prev + Math.random() * 15;
-        });
-      }, 200);
-
-      const result = await createCustomer(formData);
-      
-      // Complete the progress
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-      
-      if (result.success) {
-        // Show credentials if they were generated
-        if (result.credentials) {
-          setCredentials(result.credentials);
+      if (response.data.success) {
+        // Show credentials if provided
+        if (response.data.credentials) {
+          setCredentials(response.data.credentials);
           setShowCredentials(true);
+          toast.success("Customer registered successfully!");
         } else {
-          // Small delay to show completion
+          toast.success("Customer registered successfully!");
           setTimeout(() => {
             navigate("/customers");
-          }, 500);
+          }, 1500);
         }
+      } else {
+        toast.error(response.data.message || "Failed to register customer");
       }
     } catch (err) {
-      console.error("Customer creation error:", err);
+      console.error("Customer registration error:", err);
+      const errorMessage = err.response?.data?.message || "Failed to register customer. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -199,6 +158,8 @@ formData.append("contact[email]", address.email);
     navigator.clipboard.writeText(text);
     toast.success('Copied to clipboard!');
   };
+
+  // Branch/Tenant removed
 
   return (
     <>
@@ -248,7 +209,7 @@ formData.append("contact[email]", address.email);
               </div>
 
               <div>
-                <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Temporary Password</label>
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Password</label>
                 <div className="flex items-center justify-between gap-2 mt-1">
                   <p className="font-mono font-bold text-green-600">{credentials.password}</p>
                   <button
@@ -283,167 +244,165 @@ formData.append("contact[email]", address.email);
       <div className="form-page-container">
         <div className="form-page-header">
           <h1 className="form-page-title">Add Customer</h1>
-          <p className="form-page-subtitle">Create new customer profile</p>
+          <p className="form-page-subtitle">Register a new customer to the system</p>
         </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="form-container"
-      >
-        <section className="form-section">
-          <div className="form-section-header">
-            <h2 className="form-section-title">Branch Assignment</h2>
-            <p className="form-section-subtitle">Assign customer to branch</p>
-          </div>
-          <SelectField
-            label="Select Branch"
-            value={branchId}
-            onChange={(e) => setBranchId(e.target.value)}
-            options={branches.map((b) => ({ value: b._id, label: b.name }))}
-            required
-          />
-        </section>
-
-        <section className="form-section">
-          <div className="form-section-header">
-            <h2 className="form-section-title">Personal Details</h2>
-            <p className="form-section-subtitle">Customer's personal information</p>
-          </div>
-          <div className="form-section-divider"></div>
-          <div className="form-grid">
-            <InputField label="Full Name" value={personalInfo.fullName} onChange={(e) => setPersonalInfo({ ...personalInfo, fullName: e.target.value })} required />
-            <InputField label="Date of Birth" type="date" value={personalInfo.dob} onChange={(e) => setPersonalInfo({ ...personalInfo, dob: e.target.value })} min="1900-01-01" max={maxDob} required />
-            <SelectField label="Gender" value={personalInfo.gender} onChange={(e) => setPersonalInfo({ ...personalInfo, gender: e.target.value })} options={["Male", "Female"].map((opt) => ({ value: opt, label: opt }))} required />
-            <SelectField label="Place of Birth" value={personalInfo.placeOfBirth} onChange={(e) => setPersonalInfo({ ...personalInfo, placeOfBirth: e.target.value })} options={countries} required />
-            <SelectField label="Nationality" value={personalInfo.nationality} onChange={(e) => setPersonalInfo({ ...personalInfo, nationality: e.target.value })} options={countries} required />
-            <InputField label="ID/Passport Number" value={personalInfo.idNumber} onChange={(e) => setPersonalInfo({ ...personalInfo, idNumber: e.target.value })} required />
-            <FileUpload 
-              label="ID/Passport File" 
-              id="idFile" 
-              onFileChange={(file) => setPersonalInfo({ ...personalInfo, idFile: file })} 
-              required 
-              uploading={loading}
-              uploadProgress={uploadProgress}
-            />
-            <FileUpload 
-              label="Customer Photo (Optional)" 
-              id="photo" 
-              onFileChange={(file) => setPersonalInfo({ ...personalInfo, photo: file })} 
-              accept="image/*" 
-              uploading={loading}
-              uploadProgress={uploadProgress}
-            />
-            <MaritalStatusSection 
-              maritalStatus={maritalStatus} 
-              setMaritalStatus={setMaritalStatus} 
-              uploading={loading}
-              uploadProgress={uploadProgress}
-            />
-          </div>
-        </section>
-
-        <section className="flex flex-col gap-3">
-          <h2 className="text-md md:text-2xl font-bold">Address Details</h2>
-          <hr />
-          <AddressForm address={address} setAddress={setAddress} />
-          <div className="flex gap-3 flex-wrap">
-            <InputField label="Phone Number" value={address.phone} onChange={(e) => setAddress({ ...address, phone: e.target.value })} required />
-            <InputField label="Email Address" value={address.email} onChange={(e) => setAddress({ ...address, email: e.target.value })} required />
-          </div>
-        </section>
-
-        <section className="form-section">
-          <div className="form-section-header">
-            <h2 className="form-section-title">Employment Details</h2>
-            <p className="form-section-subtitle">Customer's employment information</p>
-          </div>
-          <div className="form-section-divider"></div>
-          <EmploymentDetails 
-            employment={employment} 
-            setEmployment={setEmployment} 
-            uploading={loading}
-            uploadProgress={uploadProgress}
-          />
-        </section>
-
-        <section className="form-section">
-          <div className="form-section-header">
-            <h2 className="form-section-title">Additional Documents</h2>
-            <p className="form-section-subtitle">Upload any additional supporting documents</p>
-          </div>
-          <div className="form-section-divider"></div>
-          <div className="space-y-4">
-            <FileUpload 
-              label="Additional Files (Optional)" 
-              id="additionalFiles" 
-              onFileChange={(files) => setPersonalInfo({ ...personalInfo, additionalFiles: files })}
-              multiple={true}
-              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
-              maxSize={10}
-              uploading={loading}
-              uploadProgress={uploadProgress}
-            />
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Supported formats: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX (Max 10MB per file)
-            </p>
-          </div>
-        </section>
-
-        <div className={`confirmation-section ${
-          showConfirmationError 
-            ? 'confirmation-section-error' 
-            : 'confirmation-section-default'
-        }`}>
-          <div className="flex items-center gap-3">
-            <div 
-              className={`custom-checkbox ${
-                isConfirmed 
-                  ? 'custom-checkbox-checked' 
-                  : 'custom-checkbox-unchecked'
-              } ${showConfirmationError ? 'custom-checkbox-error' : ''}`}
-              onClick={() => {
-                console.log('Custom checkbox clicked');
-                setIsConfirmed(!isConfirmed);
-                if (!isConfirmed) {
-                  setShowConfirmationError(false);
-                }
-              }}
-            >
-              {isConfirmed && (
-                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              )}
+        <form onSubmit={handleSubmit} className="form-container">
+          <section className="form-section">
+            <div className="form-section-header">
+              <h2 className="form-section-title">Customer Registration</h2>
+              <p className="form-section-subtitle">Enter the basic information to register a new customer</p>
             </div>
-            <span 
-              className={`confirmation-text ${
-                showConfirmationError ? 'confirmation-text-error' : 'confirmation-text-default'
-              }`}
-              onClick={() => {
-                console.log('Label clicked');
-                setIsConfirmed(!isConfirmed);
-                if (!isConfirmed) {
-                  setShowConfirmationError(false);
-                }
-              }}
-            >
-              I confirm that the information provided is correct
-            </span>
-          </div>
-          {showConfirmationError && (
-            <p className="confirmation-error-message">
-              Please check this box to confirm your information
-            </p>
-          )}
-        </div>
+            <div className="form-section-divider"></div>
+            
+            <div className="form-grid">
+              <InputField
+                label="Full Name"
+                name="fullName"
+                value={formData.fullName}
+                onChange={handleChange}
+                required
+                placeholder="Enter customer's full name"
+              />
 
-        <div className="form-actions">
-          <Button type="button" variant="secondary" onClick={() => navigate("/customers")}>Cancel</Button>
-          <Button type="submit" variant="primary" loading={loading}>
-            Submit
-          </Button>
-        </div>
-      </form>
+              <InputField
+                label="Date of Birth"
+                name="dob"
+                type="date"
+                value={formData.dob}
+                onChange={handleDateChange}
+                placeholder="Select date of birth"
+                helpText="Customer must be at least 18 years old"
+                max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
+              />
+
+              <SelectField
+                label="Gender"
+                value={formData.gender}
+                onChange={handleChange}
+                options={[
+                  { value: "Male", label: "Male" },
+                  { value: "Female", label: "Female" },
+                ]}
+              />
+
+              <InputField
+                label="Phone Number"
+                name="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={handleChange}
+                required
+                placeholder="+250 7XX XXX XXX"
+              />
+
+              <InputField
+                label="Email Address"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                placeholder="customer@example.com"
+              />
+
+              <SelectField
+                label="Employment Status"
+                value={formData.employmentStatus}
+                onChange={handleChange}
+                options={[
+                  { value: "employed", label: "Employed" },
+                  { value: "self-employed", label: "Self-Employed" },
+                  { value: "unemployed", label: "Unemployed" },
+                  { value: "student", label: "Student" },
+                  { value: "retired", label: "Retired" },
+                ]}
+              />
+
+              {formData.employmentStatus === 'employed' && (
+                <>
+                  <InputField
+                    label="Job Title"
+                    name="jobTitle"
+                    value={formData.jobTitle}
+                    onChange={handleChange}
+                    placeholder="Job Title"
+                  />
+                  <InputField
+                    label="Monthly Salary (RWF)"
+                    name="salary"
+                    type="number"
+                    value={formData.salary}
+                    onChange={handleChange}
+                    placeholder="e.g. 350000"
+                  />
+                </>
+              )}
+
+              {formData.employmentStatus === 'self-employed' && (
+                <>
+                  <InputField
+                    label="Business Name"
+                    name="businessName"
+                    value={formData.businessName}
+                    onChange={handleChange}
+                    placeholder="Business Name"
+                  />
+                  <InputField
+                    label="Monthly Revenue (RWF)"
+                    name="monthlyRevenue"
+                    type="number"
+                    value={formData.monthlyRevenue}
+                    onChange={handleChange}
+                    placeholder="e.g. 800000"
+                  />
+                </>
+              )}
+
+              <InputField
+                label="Password"
+                name="password"
+                type="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                placeholder="Minimum 8 characters"
+              />
+
+              <InputField
+                label="Confirm Password"
+                name="confirmPassword"
+                type="password"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                placeholder="Re-enter password"
+              />
+
+              
+            </div>
+          </section>
+
+          <section className="form-section">
+            <div className="form-section-header">
+              <h2 className="form-section-title">Confirmation</h2>
+              <p className="form-section-subtitle">Please confirm the information is correct</p>
+            </div>
+            <div className="form-section-divider"></div>
+            <div className="flex items-center gap-3">
+              <input id="confirm-info" type="checkbox" checked={isConfirmed} onChange={() => setIsConfirmed(!isConfirmed)} />
+              <label htmlFor="confirm-info" className="text-sm text-gray-700 dark:text-gray-300">I confirm that the information provided is correct</label>
+            </div>
+          </section>
+
+          <div className="form-actions">
+            <Button type="button" variant="secondary" onClick={() => navigate("/customers")}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" loading={loading}>
+              Register Customer
+            </Button>
+          </div>
+        </form>
       </div>
     </>
   );

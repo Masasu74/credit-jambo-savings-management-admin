@@ -26,7 +26,7 @@ export const registerCustomer = async (req, res) => {
     } = req.body;
 
     // Validate required fields (only basic fields for registration)
-    if (!fullName || !email || !password || !phone || !branchId) {
+    if (!fullName || !email || !password || !phone) {
       return res.status(400).json({
         success: false,
         message: 'All required fields must be provided'
@@ -60,13 +60,25 @@ export const registerCustomer = async (req, res) => {
 
     // ID number check removed - will be added during onboarding
 
-    // Verify branch exists
-    const branch = await Branch.findById(branchId);
-    if (!branch) {
-      return res.status(404).json({
-        success: false,
-        message: 'Selected branch not found. Please select a valid branch.'
-      });
+    // Get default branch if no branchId provided
+    let branch;
+    if (branchId) {
+      branch = await Branch.findById(branchId);
+      if (!branch) {
+        return res.status(404).json({
+          success: false,
+          message: 'Selected branch not found. Please select a valid branch.'
+        });
+      }
+    } else {
+      // Use default branch (first active branch)
+      branch = await Branch.findOne({ isActive: true });
+      if (!branch) {
+        return res.status(404).json({
+          success: false,
+          message: 'No active branch found. Please contact support.'
+        });
+      }
     }
 
     // Validate branch has required fields
@@ -274,7 +286,8 @@ export const loginCustomer = async (req, res) => {
         fullName: customer.personalInfo.fullName,
         email: customer.contact.email,
         phone: customer.contact.phone,
-        lastLogin: customer.lastLogin
+        lastLogin: customer.lastLogin,
+        deviceVerified: customer.deviceVerified || false
       }
     });
   } catch (error) {
@@ -290,7 +303,6 @@ export const loginCustomer = async (req, res) => {
 export const getCurrentCustomer = async (req, res) => {
   try {
     const customer = await Customer.findById(req.customer.customerId)
-      .populate('branch', 'name code alias')
       .select('-password');
 
     if (!customer) {
@@ -300,18 +312,22 @@ export const getCurrentCustomer = async (req, res) => {
       });
     }
 
+    const responseData = {
+      id: customer._id,
+      customerCode: customer.customerCode,
+      fullName: customer.personalInfo.fullName,
+      email: customer.contact.email,
+      phone: customer.contact.phone,
+      lastLogin: customer.lastLogin,
+      accountCreationSource: customer.accountCreationSource,
+      deviceVerified: customer.deviceVerified || false
+    };
+    
+    console.log('🔍 getCurrentCustomer response:', JSON.stringify(responseData, null, 2));
+    
     res.json({
       success: true,
-      customer: {
-        id: customer._id,
-        customerCode: customer.customerCode,
-        fullName: customer.personalInfo.fullName,
-        email: customer.contact.email,
-        phone: customer.contact.phone,
-        branch: customer.branch,
-        lastLogin: customer.lastLogin,
-        accountCreationSource: customer.accountCreationSource
-      }
+      customer: responseData
     });
   } catch (error) {
     console.error('Get current customer error:', error);
