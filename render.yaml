@@ -1,0 +1,48 @@
+services:
+  # Frontend - Static Site
+  - type: static
+    name: credit-jambo-admin-frontend
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: ./frontend/dist
+    routes:
+      - type: rewrite
+        source: "/*"
+        destination: "/index.html"
+    headers:
+      - path: "/*"
+        name: "Cache-Control"
+        value: "no-cache, no-store, must-revalidate"
+      - path: "/*"
+        name: "X-Frame-Options"
+        value: "DENY"
+      - path: "/*"
+        name: "X-XSS-Protection"
+        value: "1; mode=block"
+
+  # Backend - Web Service
+  - type: web
+    name: credit-jambo-admin-backend
+    env: node
+    plan: starter
+    buildCommand: cd backend && npm ci
+    startCommand: cd backend && node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CUSTOMER_JWT_EXPIRES_IN
+        value: 30m
+      - key: REDIS_ENABLED
+        value: "false"
+      - key: ENABLE_CLOUDINARY
+        value: "false"
+      - key: MULTI_TENANT_MODE
+        value: "false"
+      - key: DEFAULT_CLIENT
+        value: creditjambo
+
