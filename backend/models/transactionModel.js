@@ -62,7 +62,7 @@ const transactionSchema = new mongoose.Schema({
   processedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false // Optional for customer-initiated transactions
   },
   deviceId: {
     type: String,

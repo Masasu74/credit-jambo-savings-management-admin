@@ -202,6 +202,128 @@ export const processWithdrawal = async (req, res) => {
   }
 };
 
+// Customer-initiated deposit (authenticated customer on own account)
+export const customerDeposit = async (req, res) => {
+  try {
+    const { accountId, amount, description, reference } = req.body;
+    const deviceId = req.headers['x-device-id'] || 'unknown';
+    const ipAddress = (req.ip || req.connection?.remoteAddress || 'unknown').toString();
+    const userAgent = req.headers['user-agent'] || '';
+
+    const amountNumber = Number(amount);
+    if (!amountNumber || Number.isNaN(amountNumber) || amountNumber <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid deposit amount' });
+    }
+
+    const account = await SavingsAccount.findById(accountId);
+    if (!account) {
+      return res.status(404).json({ success: false, message: 'Savings account not found' });
+    }
+    // Ensure account belongs to current customer
+    if (String(account.customerId) !== String(req.customer.customerId)) {
+      return res.status(403).json({ success: false, message: 'You can only transact on your own account' });
+    }
+
+    const canDeposit = account.canDeposit(amountNumber);
+    if (!canDeposit.allowed) {
+      return res.status(400).json({ success: false, message: canDeposit.reason });
+    }
+
+    const balanceBefore = Number(account.balance) || 0;
+    account.balance = balanceBefore + amountNumber;
+    account.lastTransactionDate = new Date();
+    await account.save();
+
+    const transaction = new Transaction({
+      accountId,
+      customerId: account.customerId,
+      type: 'deposit',
+      amount: amountNumber,
+      balanceBefore,
+      balanceAfter: Number(account.balance),
+      description: description || 'Deposit transaction',
+      reference,
+      // processedBy not set for customer-initiated transactions
+      deviceId,
+      ipAddress,
+      userAgent,
+      status: 'completed'
+    });
+    await transaction.save();
+    await transaction.populate('customerId', 'personalInfo.fullName customerCode');
+
+    return res.status(201).json({
+      success: true,
+      message: 'Deposit processed successfully',
+      data: { transaction: transactionDetailsDTO(transaction), newBalance: account.balance }
+    });
+  } catch (error) {
+    console.error('Customer deposit error:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Failed to process deposit' });
+  }
+};
+
+// Customer-initiated withdrawal (authenticated customer on own account)
+export const customerWithdrawal = async (req, res) => {
+  try {
+    const { accountId, amount, description, reference } = req.body;
+    const deviceId = req.headers['x-device-id'] || 'unknown';
+    const ipAddress = (req.ip || req.connection?.remoteAddress || 'unknown').toString();
+    const userAgent = req.headers['user-agent'] || '';
+
+    const amountNumber = Number(amount);
+    if (!amountNumber || Number.isNaN(amountNumber) || amountNumber <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid withdrawal amount' });
+    }
+
+    const account = await SavingsAccount.findById(accountId);
+    if (!account) {
+      return res.status(404).json({ success: false, message: 'Savings account not found' });
+    }
+    if (String(account.customerId) !== String(req.customer.customerId)) {
+      return res.status(403).json({ success: false, message: 'You can only transact on your own account' });
+    }
+
+    // For customer-initiated withdrawals, skip account verification check (device is already verified)
+    const canWithdraw = account.canWithdraw(amountNumber, true);
+    if (!canWithdraw.allowed) {
+      return res.status(400).json({ success: false, message: canWithdraw.reason });
+    }
+
+    const balanceBefore = Number(account.balance) || 0;
+    account.balance = balanceBefore - amountNumber;
+    account.lastTransactionDate = new Date();
+    await account.save();
+
+    const transaction = new Transaction({
+      accountId,
+      customerId: account.customerId,
+      type: 'withdrawal',
+      amount: amountNumber,
+      balanceBefore,
+      balanceAfter: Number(account.balance),
+      description: description || 'Withdrawal transaction',
+      reference,
+      // processedBy not set for customer-initiated transactions
+      deviceId,
+      ipAddress,
+      userAgent,
+      status: 'completed'
+    });
+    await transaction.save();
+    await transaction.populate('customerId', 'personalInfo.fullName customerCode');
+
+    return res.status(201).json({
+      success: true,
+      message: 'Withdrawal processed successfully',
+      data: { transaction: transactionDetailsDTO(transaction), newBalance: account.balance }
+    });
+  } catch (error) {
+    console.error('Customer withdrawal error:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Failed to process withdrawal' });
+  }
+};
+
 // Get transaction by ID
 export const getTransactionById = async (req, res) => {
   try {

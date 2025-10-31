@@ -72,7 +72,7 @@ const savingsAccountSchema = new mongoose.Schema({
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false // Optional for customer-created accounts
   }
 }, {
   timestamps: true
@@ -99,12 +99,13 @@ savingsAccountSchema.pre('save', async function(next) {
 });
 
 // Instance method to check if withdrawal is allowed
-savingsAccountSchema.methods.canWithdraw = function(amount) {
+// skipVerification: if true, skips the isVerified check (for customer-initiated transactions)
+savingsAccountSchema.methods.canWithdraw = function(amount, skipVerification = false) {
   if (this.status !== 'active') {
     return { allowed: false, reason: 'Account is not active' };
   }
   
-  if (!this.isVerified) {
+  if (!skipVerification && !this.isVerified) {
     return { allowed: false, reason: 'Account is not verified' };
   }
   

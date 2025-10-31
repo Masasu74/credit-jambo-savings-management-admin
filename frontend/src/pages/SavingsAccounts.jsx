@@ -6,7 +6,8 @@ import {
   FaEdit,
   FaCheckCircle,
   FaTimesCircle,
-  FaClock
+  FaClock,
+  FaTrash
 } from 'react-icons/fa';
 
 const SavingsAccounts = () => {
@@ -41,6 +42,26 @@ const SavingsAccounts = () => {
       setAccounts([]); // Set to empty array on error
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const deleteAccount = async (id) => {
+    const confirmed = window.confirm('Are you sure you want to delete this savings account? This cannot be undone.');
+    if (!confirmed) return;
+    try {
+      const response = await fetch(`/api/savings-accounts/${id}` , {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to delete account');
+      }
+      setAccounts(prev => prev.filter(a => (a.id || a._id) !== id));
+    } catch (err) {
+      alert(err.message);
     }
   };
 
@@ -235,7 +256,7 @@ const SavingsAccounts = () => {
         ) : (
           <ul className="divide-y divide-gray-200">
             {(accounts || []).map((account) => (
-              <li key={account.id}>
+              <li key={account.id || account._id}>
                 <div className="px-4 py-4 flex items-center justify-between hover:bg-gray-50">
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-10 w-10">
@@ -254,7 +275,7 @@ const SavingsAccounts = () => {
                       </div>
                       <div className="flex items-center mt-1">
                         <p className="text-sm text-gray-500">
-                          {account.customer?.fullName || account.customerId?.fullName || 'Unknown Customer'}
+                          {account.customer?.fullName || account.customerId?.fullName || account.customerId?.personalInfo?.fullName || 'Unknown Customer'}
                         </p>
                         <span className="mx-2">•</span>
                         {getAccountTypeBadge(account.accountType)}
@@ -270,21 +291,27 @@ const SavingsAccounts = () => {
                         {account.interestRate}% interest
                       </p>
                     </div>
-                    <div className="flex space-x-2">
+                    <div className="flex space-x-3">
                       <Link
-                        to={`/savings-accounts/${account.id}`}
+                        to={`/savings-accounts/${account.id || account._id}`}
                         className="text-gray-400 hover:text-gray-600"
-                        onClick={() => console.log('👁️ View savings account clicked:', account.id)}
                       >
                         <FaEye className="h-5 w-5" />
                       </Link>
                       <Link
-                        to={`/savings-accounts/edit/${account.id}`}
+                        to={`/savings-accounts/edit/${account.id || account._id}`}
                         className="text-gray-400 hover:text-gray-600"
-                        onClick={() => console.log('✏️ Edit savings account clicked:', account.id)}
                       >
                         <FaEdit className="h-5 w-5" />
                       </Link>
+                      <button
+                        type="button"
+                        className="text-red-500 hover:text-red-600"
+                        onClick={() => deleteAccount(account.id || account._id)}
+                        title="Delete account"
+                      >
+                        <FaTrash className="h-5 w-5" />
+                      </button>
                     </div>
                   </div>
                 </div>

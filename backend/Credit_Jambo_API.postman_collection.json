@@ -1,0 +1,878 @@
+{
+	"info": {
+		"_postman_id": "credit-jambo-savings-api",
+		"name": "Credit Jambo Savings Management API",
+		"description": "Complete API collection for Credit Jambo Savings Management System\n\n**Base URL**: `http://localhost:4000`\n**Environment Variables**:\n- `base_url`: Base URL for the API\n- `admin_token`: JWT token for admin authentication\n- `customer_token`: JWT token for customer authentication\n- `device_id`: Device ID for customer requests",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Admin Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@creditjambo.com\",\n  \"password\": \"admin123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "login"]
+						},
+						"description": "Login as admin user. Returns JWT token."
+					},
+					"response": []
+				},
+				{
+					"name": "Admin Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/logout",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "logout"]
+						}
+					}
+				},
+				{
+					"name": "Get Current Admin",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/me",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "me"]
+						}
+					}
+				},
+				{
+					"name": "Customer Register",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "x-device-id",
+								"value": "{{device_id}}",
+								"description": "Device ID for device verification"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\",\n  \"phone\": \"+250788123456\",\n  \"dob\": \"1990-01-01\",\n  \"gender\": \"Male\",\n  \"employmentStatus\": \"employed\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/customer-auth/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "customer-auth", "register"]
+						}
+					}
+				},
+				{
+					"name": "Customer Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "x-device-id",
+								"value": "{{device_id}}",
+								"description": "Device ID must be verified by admin"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/customer-auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "customer-auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "Get Current Customer",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customer_token}}"
+							},
+							{
+								"key": "x-device-id",
+								"value": "{{device_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/customer-auth/me",
+							"host": ["{{base_url}}"],
+							"path": ["api", "customer-auth", "me"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Device Verification",
+			"item": [
+				{
+					"name": "Register Device",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"customerId\": \"customer_id_here\",\n  \"deviceId\": \"device_unique_id\",\n  \"deviceInfo\": {\n    \"userAgent\": \"Mozilla/5.0\",\n    \"platform\": \"Mobile\",\n    \"browser\": \"Chrome\",\n    \"os\": \"Android\"\n  },\n  \"ipAddress\": \"192.168.1.1\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/device-verifications/register",
+							"host": ["{{base_url}}"],
+							"path": ["api", "device-verifications", "register"]
+						}
+					}
+				},
+				{
+					"name": "Get Pending Verifications",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/device-verifications/pending?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["api", "device-verifications", "pending"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Verify Device (Admin)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"action\": \"verify\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/device-verifications/:id/verify",
+							"host": ["{{base_url}}"],
+							"path": ["api", "device-verifications", ":id", "verify"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "device_verification_id"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Reject Device",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"action\": \"reject\",\n  \"reason\": \"Suspicious activity detected\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/device-verifications/:id/verify",
+							"host": ["{{base_url}}"],
+							"path": ["api", "device-verifications", ":id", "verify"]
+						}
+					}
+				},
+				{
+					"name": "Get All Device Verifications",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/device-verifications?status=pending&page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["api", "device-verifications"],
+							"query": [
+								{
+									"key": "status",
+									"value": "pending"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Savings Accounts",
+			"item": [
+				{
+					"name": "Create Savings Account (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"customerId\": \"customer_id_here\",\n  \"productId\": \"product_id_here\",\n  \"accountType\": \"regular\",\n  \"minimumBalance\": 1000,\n  \"interestRate\": 5.5\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/savings-accounts",
+							"host": ["{{base_url}}"],
+							"path": ["api", "savings-accounts"]
+						}
+					}
+				},
+				{
+					"name": "Get All Savings Accounts",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/savings-accounts?page=1&limit=20&status=active",
+							"host": ["{{base_url}}"],
+							"path": ["api", "savings-accounts"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "status",
+									"value": "active"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Savings Account by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/savings-accounts/:id",
+							"host": ["{{base_url}}"],
+							"path": ["api", "savings-accounts", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "account_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Customer Savings Accounts",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/savings-accounts/customer/:customerId",
+							"host": ["{{base_url}}"],
+							"path": ["api", "savings-accounts", "customer", ":customerId"],
+							"variable": [
+								{
+									"key": "customerId",
+									"value": "customer_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Customer Savings Account (Self-Service)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customer_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"productId\": \"product_id_here\",\n  \"accountType\": \"regular\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/customer/savings-accounts",
+							"host": ["{{base_url}}"],
+							"path": ["api", "customer", "savings-accounts"]
+						}
+					}
+				},
+				{
+					"name": "Get My Savings Accounts (Customer)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customer_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/customer/savings-accounts/mine",
+							"host": ["{{base_url}}"],
+							"path": ["api", "customer", "savings-accounts", "mine"]
+						}
+					}
+				},
+				{
+					"name": "Get Account Statistics",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/savings-accounts/stats/overview",
+							"host": ["{{base_url}}"],
+							"path": ["api", "savings-accounts", "stats", "overview"]
+						}
+					}
+				},
+				{
+					"name": "Get Low Balance Accounts",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/savings-accounts/reports/low-balance?threshold=1000",
+							"host": ["{{base_url}}"],
+							"path": ["api", "savings-accounts", "reports", "low-balance"],
+							"query": [
+								{
+									"key": "threshold",
+									"value": "1000"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Transactions",
+			"item": [
+				{
+					"name": "Process Deposit (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"accountId\": \"account_id_here\",\n  \"amount\": 5000,\n  \"description\": \"Initial deposit\",\n  \"reference\": \"REF123456\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/transactions/deposit",
+							"host": ["{{base_url}}"],
+							"path": ["api", "transactions", "deposit"]
+						}
+					}
+				},
+				{
+					"name": "Process Withdrawal (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"accountId\": \"account_id_here\",\n  \"amount\": 2000,\n  \"description\": \"Cash withdrawal\",\n  \"reference\": \"REF789012\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/transactions/withdrawal",
+							"host": ["{{base_url}}"],
+							"path": ["api", "transactions", "withdrawal"]
+						}
+					}
+				},
+				{
+					"name": "Customer Deposit",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customer_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "x-device-id",
+								"value": "{{device_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"accountId\": \"account_id_here\",\n  \"amount\": 3000,\n  \"description\": \"Savings deposit\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/customer/transactions/deposit",
+							"host": ["{{base_url}}"],
+							"path": ["api", "customer", "transactions", "deposit"]
+						}
+					}
+				},
+				{
+					"name": "Customer Withdrawal",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customer_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "x-device-id",
+								"value": "{{device_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"accountId\": \"account_id_here\",\n  \"amount\": 1500,\n  \"description\": \"Cash withdrawal\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/customer/transactions/withdrawal",
+							"host": ["{{base_url}}"],
+							"path": ["api", "customer", "transactions", "withdrawal"]
+						}
+					}
+				},
+				{
+					"name": "Get All Transactions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/transactions?page=1&limit=20&type=deposit",
+							"host": ["{{base_url}}"],
+							"path": ["api", "transactions"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "type",
+									"value": "deposit"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Transaction by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/transactions/:id",
+							"host": ["{{base_url}}"],
+							"path": ["api", "transactions", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "transaction_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Customer Transactions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{customer_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/customer/transactions?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["api", "customer", "transactions"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Transaction Statistics",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/transactions/stats/overview",
+							"host": ["{{base_url}}"],
+							"path": ["api", "transactions", "stats", "overview"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Customers",
+			"item": [
+				{
+					"name": "Get All Customers",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/customers?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["api", "customers"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Customer by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/customers/:id",
+							"host": ["{{base_url}}"],
+							"path": ["api", "customers", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "customer_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Update Customer",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"personalInfo\": {\n    \"fullName\": \"John Doe Updated\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/customers/:id",
+							"host": ["{{base_url}}"],
+							"path": ["api", "customers", ":id"]
+						}
+					}
+				},
+				{
+					"name": "Get Customer Statistics",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/customers/stats/overview",
+							"host": ["{{base_url}}"],
+							"path": ["api", "customers", "stats", "overview"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Account Products",
+			"item": [
+				{
+					"name": "Get Active Products",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/account-products/active",
+							"host": ["{{base_url}}"],
+							"path": ["api", "account-products", "active"]
+						},
+						"description": "Public endpoint - no auth required"
+					}
+				},
+				{
+					"name": "Get All Products (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/account-products",
+							"host": ["{{base_url}}"],
+							"path": ["api", "account-products"]
+						}
+					}
+				},
+				{
+					"name": "Create Account Product",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"productCode\": \"REG-SAV\",\n  \"productName\": \"Regular Savings\",\n  \"accountType\": \"regular\",\n  \"minimumBalance\": 1000,\n  \"interestRate\": 5.5,\n  \"features\": [\"interest\", \"withdrawal\"]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/account-products",
+							"host": ["{{base_url}}"],
+							"path": ["api", "account-products"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "System",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/health",
+							"host": ["{{base_url}}"],
+							"path": ["api", "health"]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:4000"
+		},
+		{
+			"key": "admin_token",
+			"value": ""
+		},
+		{
+			"key": "customer_token",
+			"value": ""
+		},
+		{
+			"key": "device_id",
+			"value": "device-unique-id-12345"
+		}
+	]
+}
+

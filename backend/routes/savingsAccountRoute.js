@@ -9,9 +9,13 @@ import {
   getAccountTransactionHistory,
   getLowBalanceAccounts,
   getSavingsAccountStats,
-  getCustomerAccountSummary
+  getCustomerAccountSummary,
+  deleteSavingsAccount,
+  createCustomerSavingsAccount,
+  getMySavingsAccounts
 } from '../controllers/savingsAccountController.js';
 import auth from '../middleware/auth.js';
+import customerAuth from '../middleware/customerAuth.js';
 import { authorize } from '../middleware/rbac.js';
 
 const router = express.Router();
@@ -34,6 +38,9 @@ router.get('/customer/:customerId', authorize(['admin', 'manager', 'staff']), ge
 // Update savings account
 router.put('/:id', authorize(['admin', 'manager']), updateSavingsAccount);
 
+// Delete savings account (admin/manager)
+router.delete('/:id', authorize(['admin', 'manager']), deleteSavingsAccount);
+
 // Verify savings account (admin only)
 router.patch('/:id/verify', authorize(['admin']), verifySavingsAccount);
 
@@ -50,3 +57,12 @@ router.get('/stats/overview', authorize(['admin', 'manager', 'staff']), getSavin
 router.get('/customer/:customerId/summary', authorize(['admin', 'manager', 'staff']), getCustomerAccountSummary);
 
 export default router;
+
+// Customer self-service savings accounts
+export const createCustomerSavingsRouter = () => {
+  const customerRouter = express.Router();
+  customerRouter.use(customerAuth);
+  customerRouter.post('/', createCustomerSavingsAccount);
+  customerRouter.get('/mine', getMySavingsAccounts);
+  return customerRouter;
+};

@@ -1,4 +1,4 @@
-# Backend Dockerfile for NDFI TRACK
+# Credit Jambo Savings Management - Backend API
 # Multi-stage build for optimized production image
 
 FROM node:18-alpine AS base

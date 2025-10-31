@@ -2,8 +2,8 @@
 import express from 'express';
 import cors from 'cors';
 import { connectDB } from './config/db.js';
-import savingsAccountRouter from './routes/savingsAccountRoute.js';
-import transactionRouter from './routes/transactionRoute.js';
+import savingsAccountRouter, { createCustomerSavingsRouter } from './routes/savingsAccountRoute.js';
+import transactionRouter, { createCustomerTransactionRouter } from './routes/transactionRoute.js';
 import deviceVerificationRouter from './routes/deviceVerificationRoute.js';
 import savingsCustomerRouter from './routes/savingsCustomerRoute.js';
 import userRouter from './routes/userRoute.js';
@@ -526,6 +526,8 @@ app.get('/api/health', async (req, res) => {
 // Core API routes for savings management system
 app.use('/api/savings-accounts', savingsAccountRouter);
 app.use('/api/transactions', transactionRouter);
+app.use('/api/customer/savings-accounts', createCustomerSavingsRouter());
+app.use('/api/customer/transactions', createCustomerTransactionRouter());
 app.use('/api/device-verifications', deviceVerificationRouter);
 app.use('/api/customers', savingsCustomerRouter);
 app.use('/api/customer-auth', customerAuthRouter);

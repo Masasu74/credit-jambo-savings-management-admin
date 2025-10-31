@@ -18,8 +18,36 @@ export const createSavingsAccount = async (req, res) => {
     const { customerId, productId, accountType = 'regular', minimumBalance, interestRate } = req.body;
     const createdBy = req.user._id;
 
+    // Resolve customer identifier (supports ObjectId, customerCode, or "Full Name (CODE)")
+    let resolvedCustomer = null;
+    let resolvedCustomerId = null;
+    try {
+      // Try direct ObjectId first
+      resolvedCustomer = await Customer.findById(customerId);
+    } catch (_) {
+      resolvedCustomer = null;
+    }
+
+    if (!resolvedCustomer && typeof customerId === 'string') {
+      // Extract potential customerCode in parentheses e.g., "Name (CUST-xyz)"
+      const codeMatch = customerId.match(/\(([^)]+)\)$/);
+      const possibleCode = codeMatch?.[1];
+      if (possibleCode) {
+        resolvedCustomer = await Customer.findOne({ customerCode: possibleCode });
+      }
+      // Fallback: try by customerCode directly or by full name field if provided in plain string
+      if (!resolvedCustomer) {
+        resolvedCustomer = await Customer.findOne({ customerCode: customerId })
+          || await Customer.findOne({ 'personalInfo.fullName': customerId });
+      }
+    }
+
+    if (resolvedCustomer) {
+      resolvedCustomerId = resolvedCustomer._id;
+    }
+
     // Check if customer exists
-    const customer = await Customer.findById(customerId);
+    const customer = resolvedCustomer || null;
     if (!customer) {
       return res.status(404).json({
         success: false,
@@ -48,7 +76,7 @@ export const createSavingsAccount = async (req, res) => {
     // Check if customer already has an account for this product
     if (productId) {
       const existingAccount = await SavingsAccount.findOne({ 
-        customerId, 
+        customerId: resolvedCustomerId, 
         productId 
       });
       
@@ -66,12 +94,13 @@ export const createSavingsAccount = async (req, res) => {
 
     // Create new savings account
     const savingsAccount = new SavingsAccount({
-      customerId,
+      customerId: resolvedCustomerId,
       productId: productId || null,
       productCode: product?.productCode || '',
       accountType,
       minimumBalance: finalMinimumBalance,
       interestRate: finalInterestRate,
+      isVerified: true, // Accounts created via admin panel are verified by default
       createdBy
     });
 
@@ -425,5 +454,88 @@ export const getCustomerAccountSummary = async (req, res) => {
       message: 'Failed to fetch customer account summary',
       error: error.message
     });
+  }
+};
+
+// Delete savings account (allowed only when balance is zero)
+export const deleteSavingsAccount = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const account = await SavingsAccount.findById(id);
+    if (!account) {
+      return res.status(404).json({ success: false, message: 'Savings account not found' });
+    }
+
+    if (account.balance > 0) {
+      return res.status(400).json({ success: false, message: 'Cannot delete an account with non-zero balance' });
+    }
+
+    await SavingsAccount.findByIdAndDelete(id);
+    return res.json({ success: true, message: 'Savings account deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting savings account:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete savings account', error: error.message });
+  }
+};
+
+// Create a savings account for the authenticated customer (self-service)
+export const createCustomerSavingsAccount = async (req, res) => {
+  try {
+    const { productId, accountType = 'regular', minimumBalance, interestRate } = req.body;
+
+    const customer = await Customer.findById(req.customer.customerId);
+    if (!customer) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+
+    // If productId is provided, fetch product details
+    let product = null;
+    let productCode = '';
+    if (productId) {
+      const AccountProduct = (await import('../models/accountProductModel.js')).default;
+      product = await AccountProduct.findById(productId);
+      if (product) {
+        productCode = product.productCode || '';
+        // Use product defaults if not provided
+        if (!accountType) accountType = product.accountType || 'regular';
+        if (minimumBalance === undefined) minimumBalance = product.minimumBalance || 0;
+        if (interestRate === undefined) interestRate = product.interestRate || 0;
+      }
+    }
+
+    const savingsAccount = new SavingsAccount({
+      customerId: customer._id,
+      productId: productId || null,
+      productCode: productCode,
+      accountType: accountType,
+      minimumBalance: minimumBalance ?? 0,
+      interestRate: interestRate ?? 0,
+      isVerified: false,
+      createdBy: undefined // Not set for customer-created accounts
+    });
+
+    await savingsAccount.save();
+
+    return res.status(201).json({
+      success: true,
+      message: 'Savings account created successfully',
+      data: savingsAccountDetailsDTO(savingsAccount)
+    });
+  } catch (error) {
+    console.error('Error creating customer savings account:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Failed to create savings account' });
+  }
+};
+
+// Get authenticated customer's accounts
+export const getMySavingsAccounts = async (req, res) => {
+  try {
+    const accounts = await SavingsAccount.find({ customerId: req.customer.customerId })
+      .sort({ createdAt: -1 });
+    return res.json({ success: true, data: accounts.map(a => savingsAccountDetailsDTO(a)) });
+  } catch (error) {
+    console.error('Error fetching my savings accounts:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch savings accounts' });
   }
 };

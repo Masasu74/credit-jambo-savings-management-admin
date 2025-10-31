@@ -53,3 +53,37 @@ coverage/
 # Temporary files
 tmp/
 temp/
+*.tmp
+*.temp
+*.swp
+*~
+
+# IDE files
+.vscode/
+.idea/
+*.code-workspace
+
+# Expo (if accidentally copied)
+.expo/
+expo-env.d.ts
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.development
+.env.production
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker volumes
+docker-data/

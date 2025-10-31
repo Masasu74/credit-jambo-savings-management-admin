@@ -1,16 +1,186 @@
 import Customer from '../models/customerModel.js';
-import Branch from '../models/branchModel.js';
+import DeviceVerification from '../models/deviceVerificationModel.js';
 import InAppNotification from '../models/inAppNotificationModel.js';
+import User from '../models/userModel.js';
 import jwt from 'jsonwebtoken';
 import validator from 'validator';
 import { logActivity } from '../utils/logActivity.js';
 import { generateCustomId } from '../utils/generateCustomId.js';
+import crypto from 'crypto';
 
 // Create JWT token
 const createToken = (customerId) => {
   return jwt.sign({ customerId, type: 'customer' }, process.env.JWT_SECRET, {
-    expiresIn: '7d'
+    // Short-lived token to satisfy session expiry on inactivity/close
+    expiresIn: process.env.CUSTOMER_JWT_EXPIRES_IN || '30m'
   });
+};
+
+// Helper function to get an admin user for notifications
+const getAdminUserForNotification = async () => {
+  try {
+    // Try to find an active admin user
+    const adminUser = await User.findOne({ 
+      role: 'admin', 
+      isActive: true 
+    }).select('_id').lean();
+    
+    if (adminUser) {
+      return adminUser._id;
+    }
+    
+    // If no admin found, try to find any active user
+    const anyUser = await User.findOne({ 
+      isActive: true 
+    }).select('_id').lean();
+    
+    return anyUser?._id || null;
+  } catch (error) {
+    console.error('Error finding admin user for notification:', error);
+    return null;
+  }
+};
+
+// Helper function to create device verification notification
+const createDeviceVerificationNotification = async (title, message, customerId, deviceId, actionUrl) => {
+  try {
+    const adminUserId = await getAdminUserForNotification();
+    
+    if (!adminUserId) {
+      console.warn('⚠️ No admin user found, skipping device verification notification');
+      return null;
+    }
+    
+    await InAppNotification.create({
+      title,
+      message,
+      type: 'alert', // Use valid enum value
+      priority: 'high',
+      targetRoles: ['admin', 'manager'],
+      relatedCustomer: customerId,
+      actionUrl,
+      actionText: 'View Device',
+      createdBy: adminUserId
+    });
+    
+    return true;
+  } catch (notifError) {
+    console.error('Failed to create device verification notification:', notifError);
+    return null;
+  }
+};
+
+// Helper function to auto-register device for verification
+const autoRegisterDevice = async (customerId, deviceId, req) => {
+  if (!deviceId) return null;
+
+  try {
+    // Check if device already exists (deviceId is unique, so check by deviceId only)
+    let device = await DeviceVerification.findOne({ deviceId });
+    
+    if (device) {
+      // Device exists - check if it belongs to the same customer
+      if (device.customerId.toString() === customerId.toString()) {
+        // Same customer, same device - return existing device
+        return device;
+      } else {
+        // Device belongs to a different customer - update it to the new customer
+        // This handles cases where a device is transferred or reused
+        device.customerId = customerId;
+        device.status = 'pending';
+        device.isActive = true;
+        
+        // Update device info
+        const userAgent = req.get('User-Agent') || 'Unknown';
+        device.deviceInfo = {
+          userAgent,
+          platform: 'Mobile',
+          browser: 'Expo',
+          os: userAgent.includes('iOS') ? 'iOS' : userAgent.includes('Android') ? 'Android' : 'Unknown',
+          language: req.get('Accept-Language')?.split(',')[0] || 'en'
+        };
+        device.ipAddress = req.ip || req.connection?.remoteAddress || 'Unknown';
+        
+        // Generate new verification code
+        const verificationCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+        device.verificationCode = verificationCode;
+        device.verificationExpiry = new Date();
+        device.verificationExpiry.setHours(device.verificationExpiry.getHours() + 24);
+        
+        await device.save();
+        
+        // Create notification for admins about device transfer
+        await createDeviceVerificationNotification(
+          '🔔 Device Verification Request (Transferred)',
+          `Device transferred to new customer. Device ID: ${deviceId.substring(0, 8)}...`,
+          customerId,
+          deviceId,
+          `/device-verifications/${device._id}`
+        );
+        
+        return device;
+      }
+    } else {
+      // Device doesn't exist - create new one
+      // Generate verification code
+      const verificationCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+      const verificationExpiry = new Date();
+      verificationExpiry.setHours(verificationExpiry.getHours() + 24); // 24 hour expiry
+
+      // Extract device info from request
+      const userAgent = req.get('User-Agent') || 'Unknown';
+      const ipAddress = req.ip || req.connection?.remoteAddress || 'Unknown';
+
+      // Create new device verification record
+      device = new DeviceVerification({
+        customerId,
+        deviceId,
+        deviceInfo: {
+          userAgent,
+          platform: 'Mobile',
+          browser: 'Expo',
+          os: userAgent.includes('iOS') ? 'iOS' : userAgent.includes('Android') ? 'Android' : 'Unknown',
+          language: req.get('Accept-Language')?.split(',')[0] || 'en'
+        },
+        ipAddress,
+        status: 'pending',
+        verificationCode,
+        verificationExpiry,
+        isActive: true
+      });
+
+      await device.save();
+
+      // Create notification for admins
+      await createDeviceVerificationNotification(
+        '🔔 New Device Verification Request',
+        `Customer device needs verification. Device ID: ${deviceId.substring(0, 8)}...`,
+        customerId,
+        deviceId,
+        `/device-verifications/${device._id}`
+      );
+      
+      return device;
+    }
+  } catch (error) {
+    // Handle duplicate key error specifically
+    if (error.code === 11000 && error.keyPattern?.deviceId) {
+      console.error(`Duplicate deviceId detected: ${deviceId}. Attempting to find existing device.`);
+      // Try to find the existing device
+      const existingDevice = await DeviceVerification.findOne({ deviceId });
+      if (existingDevice) {
+        // Update to current customer if different
+        if (existingDevice.customerId.toString() !== customerId.toString()) {
+          existingDevice.customerId = customerId;
+          existingDevice.status = 'pending';
+          await existingDevice.save();
+        }
+        return existingDevice;
+      }
+    }
+    console.error('Error auto-registering device:', error);
+    return null;
+  }
 };
 
 // Customer Registration
@@ -21,8 +191,15 @@ export const registerCustomer = async (req, res) => {
       email,
       password,
       phone,
-      branchId,
-      tenant
+      tenant,
+      // Optional profile fields coming from mobile sign-up
+      dob,
+      gender,
+      employmentStatus,
+      jobTitle,
+      salary,
+      businessName,
+      monthlyRevenue
     } = req.body;
 
     // Validate required fields (only basic fields for registration)
@@ -60,39 +237,31 @@ export const registerCustomer = async (req, res) => {
 
     // ID number check removed - will be added during onboarding
 
-    // Get default branch if no branchId provided
-    let branch;
-    if (branchId) {
-      branch = await Branch.findById(branchId);
-      if (!branch) {
-        return res.status(404).json({
-          success: false,
-          message: 'Selected branch not found. Please select a valid branch.'
-        });
-      }
-    } else {
-      // Use default branch (first active branch)
-      branch = await Branch.findOne({ isActive: true });
-      if (!branch) {
-        return res.status(404).json({
-          success: false,
-          message: 'No active branch found. Please contact support.'
-        });
-      }
+    // Basic phone validation & normalization
+    const normalizedPhone = String(phone).replace(/\s|\-/g, '');
+    if (normalizedPhone.replace(/\D/g, '').length < 10) {
+      return res.status(400).json({ success: false, message: 'Please provide a valid phone number' });
     }
 
-    // Validate branch has required fields
-    if (!branch.alias) {
-      return res.status(400).json({
-        success: false,
-        message: 'Branch configuration is incomplete. Please contact support.'
-      });
+    // Optional DOB 18+ validation
+    if (dob) {
+      const birth = new Date(dob);
+      if (!isNaN(birth.getTime())) {
+        const today = new Date();
+        let age = today.getFullYear() - birth.getFullYear();
+        const m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+        if (age < 18) {
+          return res.status(400).json({ success: false, message: 'You must be at least 18 years old to register' });
+        }
+      }
     }
 
     // Generate customer code
     let customerCode;
     try {
-      customerCode = await generateCustomId('customer', branch.alias, 'CUST');
+      // Branch-less identifier generation (use a static org alias)
+      customerCode = await generateCustomId('customer', 'CJ', 'CUST');
     } catch (error) {
       console.error('Error generating customer code:', error);
       
@@ -110,17 +279,38 @@ export const registerCustomer = async (req, res) => {
       });
     }
 
-    // Create new customer with basic info only
+    // Map employment status to model enum casing
+    const toEmploymentEnum = (s) => {
+      if (!s) return undefined;
+      const map = {
+        'employed': 'Employed',
+        'self-employed': 'Self-Employed',
+        'unemployed': 'Unemployed',
+        'student': 'Unemployed',
+        'retired': 'Unemployed'
+      };
+      return map[String(s).toLowerCase()] || undefined;
+    };
+
+    // Create new customer with structured info
     const newCustomer = new Customer({
       customerCode,
-      branch: branchId,
       tenant: tenant || 'anchorfinance',
       personalInfo: {
-        fullName: fullName.trim()
+        fullName: fullName.trim(),
+        dob: dob ? new Date(dob) : undefined,
+        gender: gender || undefined
       },
       contact: {
         email: email.toLowerCase(),
-        phone: phone.trim()
+        phone: normalizedPhone
+      },
+      employment: {
+        status: toEmploymentEnum(employmentStatus),
+        jobTitle: jobTitle || undefined,
+        salary: salary ? Number(salary) : undefined,
+        businessName: businessName || undefined,
+        monthlyRevenue: monthlyRevenue ? Number(monthlyRevenue) : undefined
       },
       onboardingCompleted: false,
       password,
@@ -129,6 +319,19 @@ export const registerCustomer = async (req, res) => {
     });
 
     await newCustomer.save();
+
+    // Auto-register device if deviceId provided during registration
+    const deviceId = req.headers['x-device-id'] || req.get('x-device-id');
+    if (deviceId) {
+      const device = await autoRegisterDevice(newCustomer._id, deviceId, req);
+      if (device) {
+        console.log(`✅ Device registered for customer ${newCustomer._id}: ${deviceId.substring(0, 8)}...`);
+      } else {
+        console.warn(`⚠️ Failed to register device for customer ${newCustomer._id}: ${deviceId.substring(0, 8)}...`);
+      }
+    } else {
+      console.warn(`⚠️ No device ID provided during registration for customer ${newCustomer._id}`);
+    }
 
     // Log activity
     await logActivity({
@@ -139,24 +342,30 @@ export const registerCustomer = async (req, res) => {
       details: {
         email,
         fullName,
-        branch: branch.name,
         tenant
       }
     });
 
     // Create in-app notification for admins
     try {
-      await InAppNotification.create({
-        title: '🎉 New Customer Registration',
-        message: `${newCustomer.personalInfo.fullName} has registered for the customer portal. Customer Code: ${newCustomer.customerCode}`,
-        type: 'customer_registration',
-        priority: 'medium',
-        targetRoles: ['admin', 'manager', 'branch-manager', 'loan-officer'],
-        relatedCustomer: newCustomer._id,
-        actionUrl: `/customers/${newCustomer._id}`,
-        actionText: 'View Customer'
-      });
-      console.log('✅ In-app notification created for customer registration');
+      const adminUserId = await getAdminUserForNotification();
+      
+      if (adminUserId) {
+        await InAppNotification.create({
+          title: '🎉 New Customer Registration',
+          message: `${newCustomer.personalInfo.fullName} has registered for the customer portal. Customer Code: ${newCustomer.customerCode}`,
+          type: 'customer_added', // Use valid enum value
+          priority: 'medium',
+          targetRoles: ['admin', 'manager', 'loan-officer'],
+          relatedCustomer: newCustomer._id,
+          actionUrl: `/customers/${newCustomer._id}`,
+          actionText: 'View Customer',
+          createdBy: adminUserId
+        });
+        console.log('✅ In-app notification created for customer registration');
+      } else {
+        console.warn('⚠️ No admin user found, skipping customer registration notification');
+      }
     } catch (notifError) {
       console.error('❌ Failed to create in-app notification:', notifError);
     }
@@ -211,6 +420,7 @@ export const registerCustomer = async (req, res) => {
 export const loginCustomer = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const deviceId = req.headers['x-device-id'];
 
     // Validate inputs
     if (!email || !password) {
@@ -253,6 +463,25 @@ export const loginCustomer = async (req, res) => {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
+      });
+    }
+
+    // Enforce device verification before login
+    if (!deviceId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Device ID is required. Please provide header x-device-id.'
+      });
+    }
+
+    const isVerifiedDevice = await DeviceVerification.isDeviceVerified(customer._id, deviceId);
+    if (!isVerifiedDevice) {
+      // Auto-register device for verification if not already registered
+      await autoRegisterDevice(customer._id, deviceId, req);
+      
+      return res.status(403).json({
+        success: false,
+        message: 'This device is not verified. Please contact admin to verify your device before logging in.'
       });
     }
 
@@ -312,6 +541,16 @@ export const getCurrentCustomer = async (req, res) => {
       });
     }
 
+    // Check actual device verification status for the current device
+    const deviceId = req.headers['x-device-id'];
+    let deviceVerified = false;
+    if (deviceId) {
+      deviceVerified = await DeviceVerification.isDeviceVerified(customer._id, deviceId);
+    } else {
+      // Fallback to customer's global deviceVerified flag if no deviceId provided
+      deviceVerified = customer.deviceVerified || false;
+    }
+
     const responseData = {
       id: customer._id,
       customerCode: customer.customerCode,
@@ -320,7 +559,7 @@ export const getCurrentCustomer = async (req, res) => {
       phone: customer.contact.phone,
       lastLogin: customer.lastLogin,
       accountCreationSource: customer.accountCreationSource,
-      deviceVerified: customer.deviceVerified || false
+      deviceVerified
     };
     
     console.log('🔍 getCurrentCustomer response:', JSON.stringify(responseData, null, 2));

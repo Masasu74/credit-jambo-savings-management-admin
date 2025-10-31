@@ -10,17 +10,40 @@ import {
   getProductStats
 } from '../controllers/accountProductController.js';
 import authMiddleware from '../middleware/auth.js';
+import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 
-// All routes require authentication
+// Get only active products (accessible to both customers and admins)
+// This endpoint allows both customer and admin tokens
+router.get('/active', async (req, res, next) => {
+  try {
+    // Check if there's an auth token
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // If token is valid (either customer or admin), proceed
+        // The token type doesn't matter for this read-only endpoint
+        req.user = decoded; // Attach decoded token for potential use
+      } catch (jwtError) {
+        // Invalid token, but still allow access to active products (public info)
+        // Continue without attaching user
+      }
+    }
+    // Call the controller (works with or without auth)
+    getActiveAccountProducts(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// All other routes require admin authentication
 router.use(authMiddleware);
 
 // Get all products (with optional activeOnly filter)
 router.get('/', getAccountProducts);
-
-// Get only active products (public endpoint for customers)
-router.get('/active', getActiveAccountProducts);
 
 // Get single product
 router.get('/:id', getAccountProduct);

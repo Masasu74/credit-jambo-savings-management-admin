@@ -153,13 +153,28 @@ docker run -p 3001:80 credit-jambo-admin-frontend
 - Backend API: http://localhost:4000
 - Frontend App: http://localhost:3001
 
-## API Endpoints
+## API Documentation
 
-### Authentication
-- `POST /api/auth/login` - Admin login
-- `POST /api/auth/logout` - Admin logout
-- `GET /api/auth/profile` - Get admin profile
-- `PUT /api/auth/profile` - Update admin profile
+### Postman Collection
+
+A comprehensive Postman collection is available with all API endpoints:
+- Location: `backend/Credit_Jambo_API.postman_collection.json`
+- Documentation: `backend/API_DOCUMENTATION.md`
+
+To use:
+1. Import the collection into Postman
+2. Set up environment variables (base_url, admin_token, customer_token, device_id)
+3. Start testing endpoints
+
+### API Endpoints
+
+#### Authentication
+- `POST /api/user/login` - Admin login
+- `POST /api/user/logout` - Admin logout
+- `GET /api/user/me` - Get admin profile
+- `PUT /api/user/profile` - Update admin profile
+- `POST /api/customer-auth/register` - Customer registration
+- `POST /api/customer-auth/login` - Customer login
 
 ### Customer Management
 - `GET /api/customers` - Get all customers
@@ -236,13 +251,34 @@ docker run -p 3001:80 credit-jambo-admin-frontend
 ### Running Tests
 ```bash
 cd backend
+
+# Install dependencies (includes test packages)
+npm install
+
+# Run all tests
 npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage report
+npm run test:coverage
 ```
+
+**Test Coverage**: Tests cover authentication, transactions, savings accounts, and device verification. See `backend/API_DOCUMENTATION.md` for details.
 
 ### Code Linting
 ```bash
 cd frontend
 npm run lint
+```
+
+### Testing
+```bash
+cd backend
+npm test              # Run all tests
+npm run test:watch    # Watch mode
+npm run test:coverage # With coverage report
 ```
 
 ### Building for Production

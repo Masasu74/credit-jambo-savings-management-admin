@@ -6,6 +6,7 @@ import { useAppContext } from "../context/AppContext";
 import InputField from "../components/InputField";
 import SelectField from "../components/SelectField";
 import Button from "../components/Button";
+import CustomCheckbox from "../components/CustomCheckbox";
 
 const AddCustomer = () => {
   const { api } = useAppContext();
@@ -278,6 +279,7 @@ const AddCustomer = () => {
 
               <SelectField
                 label="Gender"
+                name="gender"
                 value={formData.gender}
                 onChange={handleChange}
                 options={[
@@ -308,6 +310,7 @@ const AddCustomer = () => {
 
               <SelectField
                 label="Employment Status"
+                name="employmentStatus"
                 value={formData.employmentStatus}
                 onChange={handleChange}
                 options={[
@@ -388,10 +391,17 @@ const AddCustomer = () => {
               <p className="form-section-subtitle">Please confirm the information is correct</p>
             </div>
             <div className="form-section-divider"></div>
-            <div className="flex items-center gap-3">
-              <input id="confirm-info" type="checkbox" checked={isConfirmed} onChange={() => setIsConfirmed(!isConfirmed)} />
-              <label htmlFor="confirm-info" className="text-sm text-gray-700 dark:text-gray-300">I confirm that the information provided is correct</label>
-            </div>
+            <CustomCheckbox
+              id="confirm-info"
+              name="confirmInfo"
+              checked={isConfirmed}
+              onChange={(val) => setIsConfirmed(val)}
+              label="I confirm that the information provided is correct"
+              size="md"
+              color="blue"
+              containerClassName="bg-transparent p-0"
+              labelClassName="text-sm text-gray-700 dark:text-gray-300"
+            />
           </section>
 
           <div className="form-actions">

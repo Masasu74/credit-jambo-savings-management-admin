@@ -1,5 +1,6 @@
 const SelectField = ({
   label,
+  name,
   value,
   onChange,
   options = [],
@@ -17,6 +18,7 @@ const SelectField = ({
       </label>
       <select
         id={selectId}
+        name={name}
         value={value}
         onChange={onChange}
         disabled={disabled}

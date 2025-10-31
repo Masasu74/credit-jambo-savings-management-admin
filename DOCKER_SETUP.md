@@ -1,6 +1,6 @@
-# Docker Setup Guide - NDFIS Management System
+# Docker Setup Guide - Credit Jambo Savings Management Admin System
 
-This guide will help you set up and run the NDFIS Management System using Docker and Docker Compose.
+This guide will help you set up and run the Credit Jambo Savings Management Admin system using Docker and Docker Compose.
 
 ## Table of Contents
 
